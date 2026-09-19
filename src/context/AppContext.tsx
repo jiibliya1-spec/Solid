@@ -279,19 +279,45 @@ export function useTodayNutrition() {
 
 export function useDailyTargets() {
   const { state } = useApp();
-  const _user = state.user;
-  const currentWeight = state.dailyLog.weight || 90;
+  const user = state.user;
+  const currentWeight = state.dailyLog.weight || user?.currentWeight || 90;
+  const height = user?.height || 175;
+  const age = user?.age || 30;
+  const goalWeight = user?.goalWeight ?? currentWeight;
   const isTrainingDay = getDayName() !== 'Wednesday' && getDayName() !== 'Sunday';
-  void _user; void currentWeight;
-  
-  const calories = isTrainingDay ? 2350 : 2050;
-  const protein = 180;
-  const fat = 65;
-  const fiber = 35;
-  const carbs = Math.round((calories - protein * 4 - fat * 9) / 4);
-  const water = 3.5;
+
+  // Mifflin-St Jeor BMR, averaged across the male/female offset since the
+  // app doesn't collect gender at onboarding.
+  const bmr = 10 * currentWeight + 6.25 * height - 5 * age - 78;
+
+  // Activity multiplier scales with the user's actual onboarding answers
+  // (how many days/week they train, and their experience level) instead of
+  // a single fixed number for everyone.
+  const trainingActivity =
+    (user?.workDays === 4 ? 1.55 : 1.45) +
+    (user?.experience === 'advanced' ? 0.1 : user?.experience === 'beginner' ? -0.05 : 0);
+  const restActivity = 1.2;
+  const tdee = bmr * (isTrainingDay ? trainingActivity : restActivity);
+
+  // Calories are nudged toward the user's actual goal direction: a real
+  // deficit when they're trying to lose, a surplus when trying to gain,
+  // maintenance when they're already at their goal weight.
+  const weightDelta = goalWeight - currentWeight;
+  const calorieAdjustment = weightDelta < -0.5 ? -500 : weightDelta > 0.5 ? 300 : 0;
+  const calories = Math.round(tdee + calorieAdjustment);
+
+  // Macros derived from the user's own bodyweight and calorie target rather
+  // than a fixed 180g/65g for everyone.
+  const protein = Math.round(currentWeight * 2); // ~2g/kg to preserve muscle in a deficit
+  const fat = Math.round((calories * 0.25) / 9);
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4));
+  const fiber = Math.round((calories / 1000) * 14); // standard 14g/1000kcal guideline
+
+  const water = Math.round(currentWeight * 0.035 * 10) / 10; // ~35ml per kg bodyweight
   const steps = 10000;
-  const sleep = 8;
+  // Sleep target uses the user's own shift-day vs. off-day sleep answers
+  // from onboarding, which were previously collected and never used.
+  const sleep = isTrainingDay ? (user?.shiftSleep ?? 6.5) : (user?.offSleep ?? 8.5);
 
   return { calories, protein, carbs, fat, fiber, water, steps, sleep, isTrainingDay };
 }
