@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, BedDouble, Calendar, Check, ChevronLeft, ChevronRight, Globe, Info, Moon, Pill, Plus, Ruler, Scale, Share2, Star, Sun, Sunset, Target, Trash2, User, Zap } from 'lucide-react';
+import { Activity, BedDouble, Calendar, Check, ChevronLeft, ChevronRight, Globe, Info, Moon, Pill, Plus, Ruler, Scale, Share2, Star as StarIcon, Sun, Sunset, Target, Trash2, User, Zap } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { Language } from '@/i18n/translations';
 import type { RecoveryDay } from '@/types';
@@ -119,7 +119,7 @@ export function SettingsScreen() {
           <SettingRow icon={<Info size={18} />} label={t('version')} value="1.0.0" />
           <button onClick={() => setToast({ visible: true, message: 'Thanks!' })} className="w-full flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
-              <Star size={18} className="text-[var(--accent-secondary)]" />
+              <StarIcon size={18} className="text-[var(--accent-secondary)]" />
               <span className="text-body text-[var(--text-primary)]">{t('rateApp')}</span>
             </div>
             <ChevronRight size={16} className="text-[var(--text-tertiary)]" />
