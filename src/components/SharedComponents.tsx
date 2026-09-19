@@ -461,3 +461,78 @@ export function Toast({ message, type = 'success', isVisible, onClose }: ToastPr
     </AnimatePresence>
   );
 }
+
+// ==================== Avatar ====================
+export const AVATAR_PRESETS: { id: string; emoji: string; gradient: string }[] = [
+  { id: 'preset:1', emoji: '💪', gradient: 'linear-gradient(135deg, #34D399, #059669)' },
+  { id: 'preset:2', emoji: '🔥', gradient: 'linear-gradient(135deg, #FB923C, #DC2626)' },
+  { id: 'preset:3', emoji: '🐯', gradient: 'linear-gradient(135deg, #FBBF24, #D97706)' },
+  { id: 'preset:4', emoji: '🦁', gradient: 'linear-gradient(135deg, #F59E0B, #B45309)' },
+  { id: 'preset:5', emoji: '🐼', gradient: 'linear-gradient(135deg, #94A3B8, #334155)' },
+  { id: 'preset:6', emoji: '🦊', gradient: 'linear-gradient(135deg, #FB7185, #E11D48)' },
+  { id: 'preset:7', emoji: '🐻', gradient: 'linear-gradient(135deg, #A78BFA, #6D28D9)' },
+  { id: 'preset:8', emoji: '🐨', gradient: 'linear-gradient(135deg, #60A5FA, #1D4ED8)' },
+  { id: 'preset:9', emoji: '🦉', gradient: 'linear-gradient(135deg, #2DD4BF, #0F766E)' },
+  { id: 'preset:10', emoji: '🐵', gradient: 'linear-gradient(135deg, #C084FC, #7C3AED)' },
+];
+
+interface AvatarProps {
+  avatar?: string;
+  name?: string;
+  size?: number;
+  className?: string;
+}
+
+/**
+ * Renders the user's chosen profile picture: an uploaded photo (data: URL),
+ * a picked preset character, or a fallback initial — instead of a single
+ * hardcoded image file for everyone.
+ */
+export function Avatar({ avatar, name, size = 48, className = '' }: AvatarProps) {
+  const style = { width: size, height: size };
+
+  if (avatar && avatar.startsWith('data:')) {
+    return (
+      <img
+        src={avatar}
+        alt={name || 'Profile'}
+        className={`rounded-full object-cover ${className}`}
+        style={style}
+      />
+    );
+  }
+
+  const preset = AVATAR_PRESETS.find(p => p.id === avatar);
+  if (preset) {
+    return (
+      <div
+        className={`rounded-full flex items-center justify-center ${className}`}
+        style={{ ...style, background: preset.gradient, fontSize: size * 0.5, lineHeight: 1 }}
+      >
+        {preset.emoji}
+      </div>
+    );
+  }
+
+  const initial = (name || 'U').trim().charAt(0).toUpperCase() || 'U';
+  return (
+    <div
+      className={`rounded-full flex items-center justify-center font-semibold ${className}`}
+      style={{ ...style, background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))', color: '#fff', fontSize: size * 0.4 }}
+    >
+      {initial}
+    </div>
+  );
+}
+
+/** Small fixed mascot avatar for the AI coach — not user-editable. */
+export function CoachAvatar({ size = 24, className = '' }: { size?: number; className?: string }) {
+  return (
+    <div
+      className={`rounded-full flex items-center justify-center flex-shrink-0 ${className}`}
+      style={{ width: size, height: size, background: 'linear-gradient(135deg, #60A5FA, #1D4ED8)', fontSize: size * 0.55, lineHeight: 1 }}
+    >
+      🤖
+    </div>
+  );
+}

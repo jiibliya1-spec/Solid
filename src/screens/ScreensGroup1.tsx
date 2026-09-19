@@ -7,7 +7,7 @@ import { addDays, format, startOfWeek } from 'date-fns';
 import { getCardioForWeek, getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
 import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE } from '@/types';
-import { BottomNav, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
+import { Avatar, BottomNav, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== Dashboard ====================
@@ -99,7 +99,7 @@ export function Dashboard() {
             <p className="text-caption text-[var(--text-secondary)]">{format(new Date(), 'EEEE, MMMM d')}</p>
           </div>
           <button onClick={() => navigate('/profile')} className="w-12 h-12 rounded-full overflow-hidden border-2 border-[var(--accent-primary)]">
-            <img src="/images/hero-avatar.jpg" alt="Profile" className="w-full h-full object-cover" />
+            <Avatar avatar={state.user?.avatar} name={state.user?.name} size={48} className="w-full h-full" />
           </button>
         </motion.div>
 

@@ -1,12 +1,12 @@
 // Merged screen file — combines: SettingsScreen, RecoveryHub, SupplementTracker
-import { useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, BedDouble, Calendar, Check, ChevronLeft, ChevronRight, Globe, Info, Moon, Pill, Plus, Ruler, Scale, Share2, Star as StarIcon, Sun, Sunset, Target, Trash2, User, Zap } from 'lucide-react';
+import { Activity, BedDouble, Calendar, Camera, Check, ChevronLeft, ChevronRight, Globe, Info, Moon, Pill, Plus, Ruler, Scale, Share2, Star as StarIcon, Sun, Sunset, Target, Trash2, User, Zap } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { Language } from '@/i18n/translations';
 import type { RecoveryDay } from '@/types';
-import { BottomSheet, ProgressRing, Toast } from '@/components/SharedComponents';
+import { AVATAR_PRESETS, Avatar, BottomSheet, ProgressRing, Toast } from '@/components/SharedComponents';
 import { LANGUAGE_NAMES, useLanguage, useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== SettingsScreen ====================
@@ -19,6 +19,41 @@ export function SettingsScreen() {
   const [showLangSheet, setShowLangSheet] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showAvatarSheet, setShowAvatarSheet] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const chooseAvatar = (id: string) => {
+    dispatch({ type: 'SET_AVATAR', payload: id });
+    setShowAvatarSheet(false);
+    setToast({ visible: true, message: 'Profile picture updated!' });
+  };
+
+  const handlePhotoUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        // Downscale to a small square so the photo fits comfortably in
+        // localStorage instead of storing the original multi-MB photo.
+        const size = 300;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        chooseAvatar(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const toggleNotification = (key: keyof typeof state.settings.notifications) => {
     dispatch({
@@ -46,6 +81,13 @@ export function SettingsScreen() {
       <div className="px-4 space-y-6">
         {/* Profile Section */}
         <Section title={t('profile')}>
+          <button onClick={() => setShowAvatarSheet(true)} className="w-full flex items-center justify-between py-3 border-b border-white/5">
+            <div className="flex items-center gap-3">
+              <Avatar avatar={state.user?.avatar} name={state.user?.name} size={36} />
+              <span className="text-body text-[var(--text-primary)]">Profile Picture</span>
+            </div>
+            <ChevronRight size={16} className="text-[var(--text-tertiary)]" />
+          </button>
           <SettingRow icon={<User size={18} />} label={t('yourName')} value={state.user?.name || 'User'} />
           <SettingRow icon={<Scale size={18} />} label={t('currentWeight')} value={`${state.user?.currentWeight || 90} kg`} />
           <SettingRow icon={<Target size={18} />} label={t('goalWeight')} value={`${state.user?.goalWeight || 78} kg`} />
@@ -166,6 +208,54 @@ export function SettingsScreen() {
               {language === lang && <CheckIcon />}
             </button>
           ))}
+        </div>
+      </BottomSheet>
+
+      {/* Avatar Picker Sheet */}
+      <BottomSheet isOpen={showAvatarSheet} onClose={() => setShowAvatarSheet(false)}>
+        <div className="px-6 pt-2 pb-6">
+          <h3 className="text-h3 text-[var(--text-primary)] text-center mb-1">Profile Picture</h3>
+          <p className="text-body-sm text-[var(--text-secondary)] text-center mb-4">Pick a character or use your own photo</p>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="user"
+            className="hidden"
+            onChange={handlePhotoUpload}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 h-12 rounded-xl mb-4 bg-[var(--accent-primary)] text-white font-semibold"
+          >
+            <Camera size={18} />
+            Take or Upload Photo
+          </button>
+
+          <div className="grid grid-cols-5 gap-3">
+            {AVATAR_PRESETS.map(preset => {
+              const isSelected = state.user?.avatar === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => chooseAvatar(preset.id)}
+                  className="flex flex-col items-center gap-1"
+                  aria-label={preset.emoji}
+                >
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+                    style={{
+                      background: preset.gradient,
+                      boxShadow: isSelected ? '0 0 0 2px var(--bg-elevated), 0 0 0 4px var(--accent-primary)' : 'none',
+                    }}
+                  >
+                    {preset.emoji}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </BottomSheet>
 

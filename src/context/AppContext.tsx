@@ -115,6 +115,7 @@ type Action =
   | { type: 'LOG_RECOVERY'; payload: RecoveryDay }
   | { type: 'TOGGLE_SUPPLEMENT'; payload: string }
   | { type: 'ADD_SUPPLEMENT'; payload: Supplement }
+  | { type: 'SET_AVATAR'; payload: string }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppState['settings']> }
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'MARK_ALL_NOTIFICATIONS_READ' }
@@ -222,6 +223,8 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'ADD_SUPPLEMENT':
       return { ...state, supplements: [...state.supplements, action.payload] };
+    case 'SET_AVATAR':
+      return state.user ? { ...state, user: { ...state.user, avatar: action.payload } } : state;
     case 'UPDATE_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.payload } };
     case 'MARK_NOTIFICATION_READ':

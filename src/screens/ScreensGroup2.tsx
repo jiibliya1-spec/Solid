@@ -6,7 +6,7 @@ import { Apple, Camera, ChevronLeft, Clock, Droplets, Flame, Moon, Plus, Scale, 
 import { format } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
-import { BottomNav, BottomSheet, ProgressRing, Toast } from '@/components/SharedComponents';
+import { BottomNav, BottomSheet, CoachAvatar, ProgressRing, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== NutritionHub ====================
@@ -566,7 +566,7 @@ export function GoalProjection() {
         {/* Coach Analysis */}
         <div className="card" style={{ borderLeft: '2px solid var(--accent-primary)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <img src="/images/ai-coach-avatar.jpg" alt="Coach" className="w-6 h-6 rounded-full" />
+            <CoachAvatar size={24} />
             <h3 className="text-h3 text-[var(--text-primary)]">{t('coachAnalysis')}</h3>
           </div>
           <p className="text-body text-[var(--text-primary)]">

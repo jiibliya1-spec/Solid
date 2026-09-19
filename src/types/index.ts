@@ -11,6 +11,8 @@ export interface User {
   shiftSleep: number;
   offSleep: number;
   workoutTime: 'morning' | 'evening';
+  /** Either a data: URL (uploaded photo) or a preset id like 'preset:3' */
+  avatar?: string;
 }
 
 export interface DailyLog {

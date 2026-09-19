@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Apple, ArrowDown, Camera, Check, ChevronLeft, Flame, Heart, Info, Send, Share2, Target, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
-import { BottomNav, BottomSheet, Toast } from '@/components/SharedComponents';
+import { BottomNav, BottomSheet, CoachAvatar, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== ProgressTracker ====================
@@ -335,7 +335,7 @@ export function AICoach() {
           <ChevronLeft size={24} className="text-[var(--text-primary)]" />
         </button>
         <div className="w-10 h-10 rounded-full overflow-hidden">
-          <img src="/images/ai-coach-avatar.jpg" alt={t('aiCoach')} className="w-full h-full object-cover" />
+          <CoachAvatar size={40} />
         </div>
         <div className="flex-1">
           <h3 className="text-h3 text-[var(--text-primary)]">{t('aiCoach')}</h3>
@@ -585,7 +585,7 @@ export function WeeklyReport() {
         {/* Coach Recommendations */}
         <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card" style={{ borderLeft: '2px solid var(--accent-primary)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <img src="/images/ai-coach-avatar.jpg" alt="Coach" className="w-6 h-6 rounded-full" />
+            <CoachAvatar size={24} />
             <h3 className="text-h3 text-[var(--text-primary)]">{t('coachNotes')}</h3>
           </div>
           <p className="text-body text-[var(--text-primary)]">

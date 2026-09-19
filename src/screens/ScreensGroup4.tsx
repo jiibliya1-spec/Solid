@@ -7,7 +7,7 @@ import { addWeeks, format } from 'date-fns';
 import { useApp } from '@/context/AppContext';
 import { FoodAIError, analyzeFoodImage, type FoodAnalysis } from '@/lib/foodAI';
 import type { User } from '@/types';
-import { Toast } from '@/components/SharedComponents';
+import { Avatar, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== Setup ====================
@@ -676,9 +676,13 @@ export function ProfileScreen() {
           className="card flex flex-col items-center py-6"
           style={{ background: 'linear-gradient(180deg, var(--bg-secondary) 0%, rgba(52,211,153,0.05) 100%)' }}
         >
-          <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-[var(--accent-primary)] mb-3">
-            <img src="/images/hero-avatar.jpg" alt={t('profile')} className="w-full h-full object-cover" />
-          </div>
+          <button
+            onClick={() => navigate('/settings')}
+            className="w-20 h-20 rounded-full overflow-hidden border-2 border-[var(--accent-primary)] mb-3 relative"
+            aria-label={t('profile')}
+          >
+            <Avatar avatar={user?.avatar} name={user?.name} size={80} className="w-full h-full" />
+          </button>
           <h2 className="text-h2 text-[var(--text-primary)]">{user?.name || t('yourName')}</h2>
           <p className="text-caption text-[var(--text-secondary)]">{t('memberSince')} May 2025</p>
           <div className="flex items-center gap-1 mt-2">
