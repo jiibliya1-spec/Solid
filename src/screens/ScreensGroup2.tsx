@@ -467,7 +467,16 @@ export function GoalProjection() {
   const weeksLeft = Math.ceil((currentWeight - goalWeight) / 0.8);
   const goalDate = new Date();
   goalDate.setDate(goalDate.getDate() + weeksLeft * 7);
-  const probability = Math.min(87 + Math.floor(Math.random() * 10), 99);
+  const probability = (() => {
+    const requiredWeeklyRate = 0.8; // kg/week target pace used elsewhere on this screen
+    const history = state.measurements;
+    if (history.length < 2) return 82; // not enough data yet: reasonable neutral estimate
+    const recent = history.slice(-4);
+    const span = recent.length - 1;
+    const actualWeeklyRate = span > 0 ? (recent[0].weight - recent[recent.length - 1].weight) / span : 0;
+    const ratio = requiredWeeklyRate > 0 ? actualWeeklyRate / requiredWeeklyRate : 1;
+    return Math.max(45, Math.min(98, Math.round(65 + ratio * 25)));
+  })();
 
   const scenarios = [
     { actionKey: 'increaseCardio', resultKey: 'reachEarlier', days: 5, color: 'var(--accent-primary)' },

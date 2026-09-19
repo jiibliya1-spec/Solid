@@ -247,7 +247,19 @@ export function RecoveryHub() {
     soreness: { legs: 2, back: 1, chest: 0, shoulders: 3, arms: 0 },
   });
 
-  const recoveryScore = 75 + Math.floor(Math.random() * 15);
+  const avgSoreness =
+    (recoveryForm.soreness.legs +
+      recoveryForm.soreness.back +
+      recoveryForm.soreness.chest +
+      recoveryForm.soreness.shoulders +
+      recoveryForm.soreness.arms) /
+    5;
+  const recoveryScore = Math.round(
+    Math.min(recoveryForm.sleepHours / 8, 1) * 40 +
+      (recoveryForm.sleepQuality / 5) * 20 +
+      (1 - recoveryForm.stressLevel / 5) * 20 +
+      (1 - avgSoreness / 4) * 20
+  );
   const scoreColor = recoveryScore >= 80 ? 'var(--accent-primary)' : recoveryScore >= 50 ? 'var(--accent-secondary)' : 'var(--accent-danger)';
   const scoreLabel = recoveryScore >= 80 ? 'Well Recovered' : recoveryScore >= 50 ? 'Moderate' : 'Needs Rest';
   const scoreSub = recoveryScore >= 80 ? 'Ready to train hard' : recoveryScore >= 50 ? 'Light training recommended' : 'Prioritize rest today';
