@@ -366,8 +366,15 @@ export function QuickLogFAB() {
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center glow-green"
-        style={{ background: 'linear-gradient(135deg, #34D399, #10B981)' }}
+        className="fixed right-4 z-40 w-14 h-14 rounded-full flex items-center justify-center glow-green"
+        style={{
+          background: 'linear-gradient(135deg, #34D399, #10B981)',
+          // Same fix as the workout control bar: BottomNav's real height on an
+          // iPhone is 64px PLUS the home-indicator safe area, so a plain
+          // "bottom-20" (fixed 80px) let the nav's safe-area padding creep up
+          // into the bottom of this button.
+          bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        }}
       >
         <Plus size={24} strokeWidth={2.5} className="text-white" />
       </motion.button>

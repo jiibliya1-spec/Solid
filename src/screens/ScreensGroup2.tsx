@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Apple, Camera, ChevronLeft, Clock, Droplets, Flame, Moon, Plus, Scale, ScanLine, Search, Star, Sun, Target, Trophy, Utensils, Zap } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, getDaysInMonth } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
 import { BottomNav, BottomSheet, CoachAvatar, ProgressRing, Toast } from '@/components/SharedComponents';
@@ -325,10 +325,20 @@ export function Achievements() {
     ? state.achievements
     : state.achievements.filter(a => a.category === activeCategory);
 
-  // Calendar days
-  const days = Array.from({ length: 30 }, (_, i) => i + 1);
-  const completedDays = [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19];
-  const today = new Date().getDate();
+  // Calendar days -- the real number of days in the current month (not a
+  // fixed 30, which drew a wrong/incomplete grid for 28/29/31-day months),
+  // and "completed" is a real check against what was actually logged that
+  // day (a finished workout, or any food logged), not a hardcoded list of
+  // days that never changes.
+  const now = new Date();
+  const days = Array.from({ length: getDaysInMonth(now) }, (_, i) => i + 1);
+  const dayIsCompleted = (day: number) => {
+    const dateStr = format(new Date(now.getFullYear(), now.getMonth(), day), 'yyyy-MM-dd');
+    const workedOut = state.workoutLog[dateStr]?.completed;
+    const ateSomething = (state.nutritionLog[dateStr]?.meals || []).some(m => m.foods.length > 0);
+    return Boolean(workedOut || ateSomething);
+  };
+  const today = now.getDate();
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)]">
@@ -432,7 +442,7 @@ export function Achievements() {
           </div>
           <div className="grid grid-cols-7 gap-1 text-center">
             {days.map(day => {
-              const isCompleted = completedDays.includes(day);
+              const isCompleted = day <= today && dayIsCompleted(day);
               const isToday = day === today;
               return (
                 <div key={day} className="relative py-2">

@@ -289,11 +289,38 @@ export function AICoach() {
     : '0';
 
   useEffect(() => {
+    const now = new Date();
+    const todayKey = format(now, 'yyyy-MM-dd');
+    const hour = now.getHours();
+    const timeGreeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
+    // Was previously grabbing whatever workout happened to be first in the
+    // log object (not necessarily today's), and always claimed "recovery
+    // looks good" even with no recovery logged. Both now reflect what's
+    // actually in state for today.
+    const todaysWorkout = state.workoutLog[todayKey];
+    const workoutLine = !todaysWorkout || todaysWorkout.exercises.length === 0
+      ? "Today's a rest day — focus on recovery."
+      : `Today's workout is ${todaysWorkout.title}.`;
+
+    const todaysRecovery = state.recovery[todayKey]?.recoveryScore;
+    const recoveryLine = todaysRecovery === undefined
+      ? "Log your recovery so I can tell you how ready you are to train."
+      : todaysRecovery >= 80
+        ? 'Your recovery score looks great, so you\'re ready to push hard.'
+        : todaysRecovery >= 50
+          ? 'Your recovery is moderate today — a solid but not maximal session makes sense.'
+          : 'Your recovery is low today — consider going lighter or prioritizing rest.';
+
+    const progressLine = state.measurements.length > 1
+      ? `You're down ${weightLost} kg since you started tracking — keep it up.`
+      : "Log a weigh-in or two and I'll start tracking your trend for you.";
+
     const greeting: ChatMessage = {
       id: '1',
       sender: 'coach',
-      text: `Good morning! Week ${week}, Day ${Math.min(week * 7, 84)}. You're down ${weightLost} kg from last week — excellent progress. Your calories today remain at ${targets.calories.toLocaleString()}. Today's workout is ${state.workoutLog[Object.keys(state.workoutLog)[0]]?.title || 'scheduled'}. Your recovery score looks good, so you're ready to push hard. Ready to crush it?`,
-      timestamp: '7:00 AM',
+      text: `${timeGreeting}! Week ${week}, Day ${Math.min(week * 7, 84)}. ${progressLine} Your calories today are targeted at ${targets.calories.toLocaleString()}. ${workoutLine} ${recoveryLine} Ready to crush it?`,
+      timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type: 'normal',
     };
     setMessages([greeting]);
