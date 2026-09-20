@@ -54,6 +54,12 @@ export interface WorkoutEntry {
   completed: boolean;
   duration: number;
   cardioMinutes: number;
+  // Which weeklySchedule entry this was built from, so the app can tell an
+  // out-of-date entry (built before the schedule was last edited) apart from
+  // a current one, and silently rebuild it. Optional because entries saved
+  // before this field existed won't have it -- which is exactly the signal
+  // that they need rebuilding too.
+  workoutId?: string;
 }
 
 export interface FoodItem {

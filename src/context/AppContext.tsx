@@ -35,6 +35,7 @@ const buildWorkoutEntry = (dayName: string, workoutId: string, customWorkouts: R
     completed: false,
     duration: 0,
     cardioMinutes: 0,
+    workoutId,
   };
 };
 
@@ -127,33 +128,51 @@ function appReducer(state: AppState, action: Action): AppState {
   
   switch (action.type) {
     case 'ROLL_OVER_DAY': {
-      // Nothing changed -- we're still on the same calendar day this state was
-      // last touched on, so there's nothing to roll over.
-      if (state.dailyLog.date === todayKey) return state;
       if (!state.user) return state;
 
       const dayName = getDayName();
-      const workoutId = state.weeklySchedule[dayName] ?? REST_WORKOUT_ID;
-      const workoutEntry = buildWorkoutEntry(dayName, workoutId, state.customWorkouts);
+      const isNewCalendarDay = state.dailyLog.date !== todayKey;
+
+      // Reset the day's stats only when the calendar date actually changed
+      // (app opened for the first time today).
       const lastWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.dailyLog.weight;
+      const dailyLog = isNewCalendarDay
+        ? {
+            date: todayKey,
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            fiber: 0,
+            water: 0,
+            steps: 0,
+            sleep: 0,
+            weight: lastWeight,
+            workoutsCompleted: 0,
+            supplementsTaken: 0,
+          }
+        : state.dailyLog;
+
+      // Reconcile today's workout against the current schedule independently
+      // of the date check above. This is what fixes an entry that was built
+      // under an old schedule (or an older version of the app, before this
+      // field existed) and would otherwise sit stale until the calendar date
+      // next changes -- it now self-heals every time the app is opened or
+      // regains focus, as long as nothing's been logged against it yet.
+      const correctWorkoutId = state.weeklySchedule[dayName] ?? REST_WORKOUT_ID;
+      const existing = isNewCalendarDay ? undefined : state.workoutLog[todayKey];
+      const hasProgress = existing?.exercises.some(e => e.completedSets.some(s => s.completed)) || existing?.completed;
+      const needsRebuild = !existing || (!hasProgress && existing.workoutId !== correctWorkoutId);
+      const workoutEntry = needsRebuild
+        ? buildWorkoutEntry(dayName, correctWorkoutId, state.customWorkouts)
+        : existing;
+
+      if (!isNewCalendarDay && !needsRebuild) return state;
 
       return {
         ...state,
-        dailyLog: {
-          date: todayKey,
-          calories: 0,
-          protein: 0,
-          carbs: 0,
-          fat: 0,
-          fiber: 0,
-          water: 0,
-          steps: 0,
-          sleep: 0,
-          weight: lastWeight,
-          workoutsCompleted: 0,
-          supplementsTaken: 0,
-        },
-        workoutLog: { ...state.workoutLog, [todayKey]: state.workoutLog[todayKey] ?? workoutEntry },
+        dailyLog,
+        workoutLog: { ...state.workoutLog, [todayKey]: workoutEntry },
         nutritionLog: {
           ...state.nutritionLog,
           [todayKey]: state.nutritionLog[todayKey] ?? {
