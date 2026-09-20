@@ -106,11 +106,16 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: var(--bg-primary);
     color: var(--text-primary);
     overscroll-behavior-y: none;
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -118,12 +123,19 @@
 
 @layer components {
   .app-container {
+    /* IMPORTANT: no overflow-x/overflow-y here. Every screen header uses
+       `position: sticky`, and on iOS Safari a sticky element stops
+       hit-testing correctly (it visually stays pinned but taps pass
+       through or land on the wrong element) as soon as ANY ancestor sets
+       `overflow` on either axis -- this is a known WebKit bug, not
+       specific to overflow-x. Horizontal clipping is handled on
+       html/body instead, which are not the sticky elements' containing
+       block. */
     max-width: 430px;
     margin: 0 auto;
     min-height: 100dvh;
     background: var(--bg-primary);
     position: relative;
-    overflow-x: hidden;
   }
 
   .card {
