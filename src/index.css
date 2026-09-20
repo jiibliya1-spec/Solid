@@ -136,6 +136,26 @@
     min-height: 100dvh;
     background: var(--bg-primary);
     position: relative;
+    /* index.html sets apple-mobile-web-app-status-bar-style to
+       black-translucent, which makes an installed (Add to Home Screen)
+       app draw its own content underneath the iOS status bar instead of
+       Safari pushing the page down for it. Without this, every screen's
+       top-0 sticky header renders partly (or fully) behind the status
+       bar / notch -- it *looks* stuck and its buttons sit where iOS's
+       own status bar intercepts touches, so they don't register. This
+       only shows up in standalone/home-screen mode, never in a normal
+       Safari tab, which is why it survived the earlier overflow-x fix. */
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Every screen's sticky header uses Tailwind's `sticky top-0`. Once the
+     page has safe-area padding at the top (above), a header stuck at
+     literal top:0 would stick back up underneath the status bar on
+     scroll. Re-pin it just below the status bar instead, so it stays
+     tappable and visually consistent whether the page is scrolled or
+     not. */
+  .app-container .sticky.top-0 {
+    top: env(safe-area-inset-top, 0px);
   }
 
   .card {
