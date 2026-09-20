@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, User, DailyLog, WorkoutEntry, Measurement, RecoveryDay, Supplement, FoodItem } from '@/types';
-import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, TRAINING_DAYS_BY_FREQUENCY, getWorkoutForDay } from '@/types';
+import type { AppState, User, DailyLog, WorkoutEntry, Measurement, RecoveryDay, Supplement, FoodItem, WorkoutTemplate } from '@/types';
+import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, REST_WORKOUT_ID, defaultWeeklySchedule, resolveWorkout } from '@/types';
 import { format, getDay } from 'date-fns';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -23,22 +23,27 @@ const createInitialDailyLog = (startWeight = 0): DailyLog => ({
   supplementsTaken: 0,
 });
 
-const getDefaultState = (): AppState => {
-  const todayKey = getTodayKey();
-  const dayName = getDayName();
-  const workoutSchedule = getWorkoutForDay(dayName, 4);
-  
-  const workoutEntry: WorkoutEntry = {
+const buildWorkoutEntry = (dayName: string, workoutId: string, customWorkouts: Record<string, WorkoutTemplate>): WorkoutEntry => {
+  const template = resolveWorkout(workoutId, customWorkouts);
+  return {
     day: dayName,
-    title: workoutSchedule.title,
-    exercises: workoutSchedule.exercises.map(e => ({
+    title: template.title,
+    exercises: template.exercises.map(e => ({
       ...e,
       completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
     })),
     completed: false,
     duration: 0,
-    cardioMinutes: workoutSchedule.cardio ? 0 : 0,
+    cardioMinutes: 0,
   };
+};
+
+const getDefaultState = (): AppState => {
+  const todayKey = getTodayKey();
+  const dayName = getDayName();
+  const weeklySchedule = defaultWeeklySchedule(4);
+  const customWorkouts: Record<string, WorkoutTemplate> = {};
+  const workoutEntry = buildWorkoutEntry(dayName, weeklySchedule[dayName], customWorkouts);
 
   return {
     user: null,
@@ -73,6 +78,8 @@ const getDefaultState = (): AppState => {
       units: 'metric',
     },
     notifications: [],
+    weeklySchedule,
+    customWorkouts,
   };
 };
 
@@ -90,6 +97,9 @@ const loadState = (): AppState => {
 type Action =
   | { type: 'SET_USER'; payload: User }
   | { type: 'UPDATE_USER'; payload: Partial<User> }
+  | { type: 'SET_DAY_WORKOUT'; payload: { day: string; workoutId: string } }
+  | { type: 'SAVE_CUSTOM_WORKOUT'; payload: { id: string } & WorkoutTemplate }
+  | { type: 'DELETE_CUSTOM_WORKOUT'; payload: string }
   | { type: 'SET_SCREEN'; payload: string }
   | { type: 'UPDATE_DAILY_LOG'; payload: Partial<DailyLog> }
   | { type: 'LOG_WATER'; payload: number }
@@ -123,18 +133,8 @@ function appReducer(state: AppState, action: Action): AppState {
       if (!state.user) return state;
 
       const dayName = getDayName();
-      const schedule = getWorkoutForDay(dayName, state.user.workDays);
-      const workoutEntry: WorkoutEntry = {
-        day: dayName,
-        title: schedule.title,
-        exercises: schedule.exercises.map(e => ({
-          ...e,
-          completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
-        })),
-        completed: false,
-        duration: 0,
-        cardioMinutes: 0,
-      };
+      const workoutId = state.weeklySchedule[dayName] ?? REST_WORKOUT_ID;
+      const workoutEntry = buildWorkoutEntry(dayName, workoutId, state.customWorkouts);
       const lastWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.dailyLog.weight;
 
       return {
@@ -174,30 +174,18 @@ function appReducer(state: AppState, action: Action): AppState {
 
       // getDefaultState() had to seed *today's* workout entry before we knew the
       // user's real workDays choice (they hadn't onboarded yet), so it guessed.
-      // Now that onboarding just gave us the real answer, rebuild today's workout
-      // from the schedule that actually matches it -- otherwise someone who picked
-      // "3 days/week" could be stuck looking at a 5-day template's rest days (e.g.
-      // Sunday always showing as rest even though it should be a training day for
-      // their chosen frequency).
+      // Now that onboarding just gave us the real answer, rebuild the whole
+      // week's schedule (and today's workout) from it.
       const dayName = getDayName();
-      const schedule = getWorkoutForDay(dayName, action.payload.workDays);
-      const workoutEntry: WorkoutEntry = {
-        day: dayName,
-        title: schedule.title,
-        exercises: schedule.exercises.map(e => ({
-          ...e,
-          completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
-        })),
-        completed: false,
-        duration: 0,
-        cardioMinutes: 0,
-      };
+      const weeklySchedule = defaultWeeklySchedule(action.payload.workDays);
+      const workoutEntry = buildWorkoutEntry(dayName, weeklySchedule[dayName], state.customWorkouts);
 
       return {
         ...state,
         user: action.payload,
         currentScreen: 'dashboard',
         dailyLog: { ...state.dailyLog, date: todayKey, weight },
+        weeklySchedule,
         workoutLog: { ...state.workoutLog, [todayKey]: workoutEntry },
         // Seed the very first measurement from what the user actually entered during
         // onboarding, instead of showing fake history. Body-part measurements (waist,
@@ -209,35 +197,43 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'UPDATE_USER': {
       if (!state.user) return state;
-      const updatedUser = { ...state.user, ...action.payload };
-
-      // If the training-days-per-week choice changed, today's workout needs
-      // to follow the new schedule -- but only if nothing's actually been
-      // logged against today's workout yet, so changing this setting can
-      // never silently wipe out sets the user already completed.
+      return { ...state, user: { ...state.user, ...action.payload } };
+    }
+    case 'SET_DAY_WORKOUT': {
+      // Assign a specific workout (or rest) to a specific day of the week --
+      // this is the user directly editing their schedule, so it always wins
+      // over whatever the 3/4-day default would have picked.
+      const weeklySchedule = { ...state.weeklySchedule, [action.payload.day]: action.payload.workoutId };
       let workoutLog = state.workoutLog;
-      if (action.payload.workDays !== undefined && action.payload.workDays !== state.user.workDays) {
+      // If they just edited *today*, and nothing's been logged against
+      // today's workout yet, rebuild it immediately so the change is visible
+      // without waiting for tomorrow's rollover.
+      if (action.payload.day === getDayName()) {
         const existing = state.workoutLog[todayKey];
         const hasProgress = existing?.exercises.some(e => e.completedSets.some(s => s.completed)) || existing?.completed;
         if (!hasProgress) {
-          const dayName = getDayName();
-          const schedule = getWorkoutForDay(dayName, updatedUser.workDays);
-          const workoutEntry: WorkoutEntry = {
-            day: dayName,
-            title: schedule.title,
-            exercises: schedule.exercises.map(e => ({
-              ...e,
-              completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
-            })),
-            completed: false,
-            duration: 0,
-            cardioMinutes: 0,
+          workoutLog = {
+            ...state.workoutLog,
+            [todayKey]: buildWorkoutEntry(action.payload.day, action.payload.workoutId, state.customWorkouts),
           };
-          workoutLog = { ...state.workoutLog, [todayKey]: workoutEntry };
         }
       }
-
-      return { ...state, user: updatedUser, workoutLog };
+      return { ...state, weeklySchedule, workoutLog };
+    }
+    case 'SAVE_CUSTOM_WORKOUT': {
+      const { id, ...template } = action.payload;
+      return { ...state, customWorkouts: { ...state.customWorkouts, [id]: template } };
+    }
+    case 'DELETE_CUSTOM_WORKOUT': {
+      const customWorkouts = { ...state.customWorkouts };
+      delete customWorkouts[action.payload];
+      // Any day that was running the deleted workout falls back to rest
+      // rather than silently breaking.
+      const weeklySchedule = { ...state.weeklySchedule };
+      for (const day of Object.keys(weeklySchedule)) {
+        if (weeklySchedule[day] === action.payload) weeklySchedule[day] = REST_WORKOUT_ID;
+      }
+      return { ...state, customWorkouts, weeklySchedule };
     }
     case 'SET_SCREEN':
       return { ...state, currentScreen: action.payload };
@@ -437,7 +433,7 @@ export function useDailyTargets() {
   const height = user?.height || 175;
   const age = user?.age || 30;
   const goalWeight = user?.goalWeight ?? currentWeight;
-  const isTrainingDay = (TRAINING_DAYS_BY_FREQUENCY[user?.workDays ?? 4] ?? TRAINING_DAYS_BY_FREQUENCY[4]).includes(getDayName());
+  const isTrainingDay = (state.weeklySchedule[getDayName()] ?? REST_WORKOUT_ID) !== REST_WORKOUT_ID;
 
   // Mifflin-St Jeor BMR, averaged across the male/female offset since the
   // app doesn't collect gender at onboarding.

@@ -227,7 +227,7 @@ export function SettingsScreen() {
         <div className="px-6 pt-2 pb-6">
           <h3 className="text-h3 text-[var(--text-primary)] text-center mb-1">{t('workDaysPerWeek')}</h3>
           <p className="text-body-sm text-[var(--text-secondary)] text-center mb-4">
-            Changes today's workout too, unless you've already logged sets for it today.
+            Used to estimate your calorie needs. To choose exactly which days you train and what you do on them, go to Workout → Schedule.
           </p>
           <div className="flex bg-[var(--bg-tertiary)] rounded-xl p-1">
             {([3, 4] as const).map(n => (

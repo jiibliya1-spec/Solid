@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { AppProvider, useApp } from '@/context/AppContext';
-import { Dashboard, WorkoutSchedule, FoodDetail, ExerciseDetail } from '@/screens/ScreensGroup1';
+import { Dashboard, WorkoutSchedule, CreateWorkout, FoodDetail, ExerciseDetail } from '@/screens/ScreensGroup1';
 import { NutritionHub, Achievements, GoalProjection, Onboarding } from '@/screens/ScreensGroup2';
 import { WorkoutDetail, WorkoutLibrary, MealPlanner, EditFood, BarcodeScanner } from '@/screens/ScreensGroup3';
 import { Setup, AIFoodScanner, NotificationsScreen, ProfileScreen } from '@/screens/ScreensGroup4';
@@ -21,6 +21,7 @@ function AppRoutes() {
         <Route path="/workout" element={state.user ? <WorkoutDetail /> : <Navigate to="/onboarding" replace />} />
         <Route path="/workout/library" element={state.user ? <WorkoutLibrary /> : <Navigate to="/onboarding" replace />} />
         <Route path="/workout/schedule" element={state.user ? <WorkoutSchedule /> : <Navigate to="/onboarding" replace />} />
+        <Route path="/workout/create" element={state.user ? <CreateWorkout /> : <Navigate to="/onboarding" replace />} />
         <Route path="/workout/exercise/:name" element={state.user ? <ExerciseDetail /> : <Navigate to="/onboarding" replace />} />
         <Route path="/nutrition" element={state.user ? <NutritionHub /> : <Navigate to="/onboarding" replace />} />
         <Route path="/nutrition/food/:name" element={state.user ? <FoodDetail /> : <Navigate to="/onboarding" replace />} />

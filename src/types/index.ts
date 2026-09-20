@@ -147,6 +147,20 @@ export interface AppState {
   supplements: Supplement[];
   settings: AppSettings;
   notifications: AppNotification[];
+  /** Which workout runs on each day of the week: a key into BUILT_IN_WORKOUTS
+   * or customWorkouts, or REST_WORKOUT_ID. Fully user-editable from the
+   * Workout Schedule screen -- not derived from workDays once the user has
+   * customized it. */
+  weeklySchedule: { [dayName: string]: string };
+  /** Workouts the user built themselves (their own exercises/sets/reps),
+   * addressable from weeklySchedule alongside the 5 built-in templates. */
+  customWorkouts: { [id: string]: WorkoutTemplate };
+}
+
+export interface WorkoutTemplate {
+  title: string;
+  cardio: boolean;
+  exercises: Omit<Exercise, 'completedSets'>[];
 }
 
 export interface AppNotification {
@@ -244,33 +258,59 @@ export const WORKOUT_SCHEDULE: Record<string, { title: string; exercises: Omit<E
   Sunday: { title: 'Recovery / Rest', cardio: false, exercises: [] },
 };
 
-// The 5 real training templates, in a fixed rotation order. Used together
-// with TRAINING_DAYS_BY_FREQUENCY below to build a schedule that actually
-// matches how many days/week the user picked at onboarding -- instead of
-// the fixed Mon-Sat template above (which assumes everyone trains 5
-// days/week and is always off Wednesday+Sunday, regardless of what they
-// chose).
-const WORKOUT_TEMPLATE_ORDER = ['Monday', 'Tuesday', 'Thursday', 'Friday', 'Saturday'];
+export const REST_WORKOUT_ID = 'rest';
 
-const REST_TEMPLATE: { title: string; exercises: Omit<Exercise, 'completedSets'>[]; cardio: boolean } = {
-  title: 'Recovery / Rest',
-  cardio: false,
-  exercises: [],
+const REST_TEMPLATE: WorkoutTemplate = { title: 'Recovery / Rest', cardio: false, exercises: [] };
+
+// The 5 built-in templates, addressable by a stable id (not a day name --
+// which day, if any, runs which template is now entirely up to
+// weeklySchedule, editable per day from the Workout Schedule screen).
+export const BUILT_IN_WORKOUTS: Record<string, WorkoutTemplate> = {
+  shoulders: WORKOUT_SCHEDULE.Monday,
+  back: WORKOUT_SCHEDULE.Tuesday,
+  chest: WORKOUT_SCHEDULE.Thursday,
+  legs: WORKOUT_SCHEDULE.Friday,
+  arms: WORKOUT_SCHEDULE.Saturday,
 };
+
+const WORKOUT_ORDER = ['shoulders', 'back', 'chest', 'legs', 'arms'];
 
 export const TRAINING_DAYS_BY_FREQUENCY: Record<3 | 4, string[]> = {
   3: ['Monday', 'Wednesday', 'Friday'],
   4: ['Monday', 'Tuesday', 'Thursday', 'Friday'],
 };
 
-/** Real weekly schedule: which template (or rest) a given day is, based on
- * how many days/week the user actually chose during onboarding. */
-export function getWorkoutForDay(dayName: string, workDays: 3 | 4 = 4) {
+const ALL_DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+/** Only used to seed a brand-new user's schedule at onboarding (before
+ * they've customized anything). Once weeklySchedule exists it's the
+ * source of truth for every day -- the user can reassign or rest any day
+ * freely from the Workout Schedule screen, regardless of this default. */
+export function defaultWeeklySchedule(workDays: 3 | 4 = 4): Record<string, string> {
   const trainingDays = TRAINING_DAYS_BY_FREQUENCY[workDays] ?? TRAINING_DAYS_BY_FREQUENCY[4];
-  const idx = trainingDays.indexOf(dayName);
-  if (idx === -1) return REST_TEMPLATE;
-  const templateKey = WORKOUT_TEMPLATE_ORDER[idx % WORKOUT_TEMPLATE_ORDER.length];
-  return WORKOUT_SCHEDULE[templateKey];
+  const schedule: Record<string, string> = {};
+  let i = 0;
+  for (const day of ALL_DAY_NAMES) {
+    if (trainingDays.includes(day)) {
+      schedule[day] = WORKOUT_ORDER[i % WORKOUT_ORDER.length];
+      i++;
+    } else {
+      schedule[day] = REST_WORKOUT_ID;
+    }
+  }
+  return schedule;
+}
+
+/** Resolve a weeklySchedule entry (a workout id, or REST_WORKOUT_ID) to its
+ * actual template -- checking built-ins first, then the user's own custom
+ * workouts, and falling back to rest for anything unrecognized (e.g. a
+ * custom workout that was since deleted). */
+export function resolveWorkout(
+  workoutId: string | undefined,
+  customWorkouts: Record<string, WorkoutTemplate>
+): WorkoutTemplate {
+  if (!workoutId || workoutId === REST_WORKOUT_ID) return REST_TEMPLATE;
+  return BUILT_IN_WORKOUTS[workoutId] || customWorkouts[workoutId] || REST_TEMPLATE;
 }
 
 export const CARDIO_PROGRESSION = [

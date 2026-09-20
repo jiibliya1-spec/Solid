@@ -2,12 +2,12 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Activity, AlertTriangle, ArrowDown, BedDouble, Bell, ChevronLeft, ChevronRight, Droplets, Dumbbell, Flame, Heart, Moon, Play, Plus, Quote, Settings, Star, Target, Timer, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, AlertTriangle, ArrowDown, BedDouble, Bell, ChevronLeft, ChevronRight, Droplets, Dumbbell, Flame, Heart, Moon, Play, Plus, Quote, Settings, Star, Target, Timer, TrendingUp, Trash2, Trophy } from 'lucide-react';
 import { addDays, format, startOfWeek } from 'date-fns';
 import { getCardioForWeek, getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
-import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE, getWorkoutForDay } from '@/types';
-import { Avatar, BottomNav, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
+import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE, BUILT_IN_WORKOUTS, REST_WORKOUT_ID, resolveWorkout } from '@/types';
+import { Avatar, BottomNav, BottomSheet, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== Dashboard ====================
@@ -373,14 +373,22 @@ function getGreeting() {
 // ==================== WorkoutSchedule ====================
 export function WorkoutSchedule() {
   const { t } = useTranslation();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const week = state.user ? getCurrentWeek(state.user.startDate) : 1;
   const cardioMins = getCardioForWeek(week);
   const [offset, setOffset] = useState(0);
+  const [pickerDay, setPickerDay] = useState<string | null>(null);
   const weekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), offset * 7);
 
   const dayNameKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
+  const allDayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+  const pickWorkout = (workoutId: string) => {
+    if (!pickerDay) return;
+    dispatch({ type: 'SET_DAY_WORKOUT', payload: { day: pickerDay, workoutId } });
+    setPickerDay(null);
+  };
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-8">
@@ -401,21 +409,24 @@ export function WorkoutSchedule() {
           </div>
           <button onClick={() => setOffset(o => o + 1)} className="p-2"><ChevronRight size={20} className="text-[var(--text-primary)]" /></button>
         </div>
+        <p className="text-caption text-[var(--text-tertiary)] text-center">Tap any day to change what you do on it — this repeats every week.</p>
 
         {/* Day cards */}
         <div className="space-y-2">
           {dayNameKeys.map((dayKey, idx) => {
-            const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][idx];
-            const schedule = getWorkoutForDay(dayName, state.user?.workDays);
+            const dayName = allDayNames[idx];
+            const workoutId = state.weeklySchedule[dayName] ?? REST_WORKOUT_ID;
+            const schedule = resolveWorkout(workoutId, state.customWorkouts);
             const isToday = format(new Date(), 'EEEE') === dayName && offset === 0;
-            const isRest = schedule.exercises.length === 0;
+            const isRest = workoutId === REST_WORKOUT_ID;
 
             return (
-              <motion.div
+              <motion.button
                 key={dayKey}
+                onClick={() => setPickerDay(dayName)}
                 initial={{ opacity: 0, x: offset > 0 ? 20 : -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                className={`card flex items-center gap-3 relative overflow-hidden ${isToday ? 'border border-[var(--accent-primary)]/50' : ''}`}
+                className={`card w-full flex items-center gap-3 relative overflow-hidden text-left ${isToday ? 'border border-[var(--accent-primary)]/50' : ''}`}
               >
                 {/* Color bar */}
                 <div
@@ -433,13 +444,76 @@ export function WorkoutSchedule() {
                     {isRest ? t('restDayMessage') : `${schedule.title} · ${schedule.exercises.length} ${t('exercises')}`}
                   </p>
                 </div>
-                <div className="text-[var(--text-tertiary)]">
+                <div className="text-[var(--text-tertiary)] flex items-center gap-1">
                   {isRest ? <BedDouble size={18} /> : <Dumbbell size={18} className="text-[var(--accent-primary)]" />}
+                  <ChevronRight size={16} />
                 </div>
-              </motion.div>
+              </motion.button>
             );
           })}
         </div>
+
+        {/* Day workout picker */}
+        <BottomSheet isOpen={pickerDay !== null} onClose={() => setPickerDay(null)}>
+          <div className="px-6 pt-2 pb-6 max-h-[70vh] overflow-y-auto">
+            <h3 className="text-h3 text-[var(--text-primary)] text-center mb-4">
+              {pickerDay ? t(pickerDay.toLowerCase() as any) : ''}
+            </h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => pickWorkout(REST_WORKOUT_ID)}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl ${
+                  pickerDay && (state.weeklySchedule[pickerDay] ?? REST_WORKOUT_ID) === REST_WORKOUT_ID
+                    ? 'bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30'
+                    : 'bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                <BedDouble size={18} className="text-[var(--text-tertiary)]" />
+                <span className="text-body text-[var(--text-primary)]">{t('restDayMessage')}</span>
+              </button>
+              {Object.entries(BUILT_IN_WORKOUTS).map(([id, w]) => (
+                <button
+                  key={id}
+                  onClick={() => pickWorkout(id)}
+                  className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl ${
+                    pickerDay && state.weeklySchedule[pickerDay] === id
+                      ? 'bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30'
+                      : 'bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Dumbbell size={18} className="text-[var(--accent-primary)]" />
+                    <span className="text-body text-[var(--text-primary)]">{w.title}</span>
+                  </div>
+                  <span className="text-caption text-[var(--text-tertiary)]">{w.exercises.length} {t('exercises')}</span>
+                </button>
+              ))}
+              {Object.entries(state.customWorkouts).map(([id, w]) => (
+                <button
+                  key={id}
+                  onClick={() => pickWorkout(id)}
+                  className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl ${
+                    pickerDay && state.weeklySchedule[pickerDay] === id
+                      ? 'bg-[var(--accent-primary)]/15 border border-[var(--accent-primary)]/30'
+                      : 'bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Star size={18} className="text-[var(--accent-secondary)]" />
+                    <span className="text-body text-[var(--text-primary)]">{w.title}</span>
+                  </div>
+                  <span className="text-caption text-[var(--text-tertiary)]">{w.exercises.length} {t('exercises')}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setPickerDay(null); navigate('/workout/create'); }}
+              className="w-full flex items-center justify-center gap-2 h-12 rounded-xl mt-4 border border-dashed border-[var(--accent-primary)]/40 text-[var(--accent-primary)] font-medium"
+            >
+              <Plus size={18} /> Create New Workout
+            </button>
+          </div>
+        </BottomSheet>
 
         {/* Cardio Progression */}
         <div className="card">
@@ -477,6 +551,136 @@ const FOOD_DB: Record<string, FoodItem> = {
   'eggs': { name: 'Scrambled Eggs (2)', calories: 180, protein: 12, carbs: 2, fat: 14, fiber: 0, serving: '2 eggs' },
   'broccoli': { name: 'Broccoli', calories: 34, protein: 2.8, carbs: 7, fat: 0.4, fiber: 2.6, serving: '100g' },
 };
+
+// ==================== CreateWorkout ====================
+interface DraftExercise {
+  name: string;
+  sets: string;
+  reps: string;
+}
+
+export function CreateWorkout() {
+  const { dispatch } = useApp();
+  const navigate = useNavigate();
+  const [title, setTitle] = useState('');
+  const [exercises, setExercises] = useState<DraftExercise[]>([{ name: '', sets: '3', reps: '10' }]);
+
+  const updateExercise = (i: number, field: keyof DraftExercise, value: string) => {
+    setExercises(prev => prev.map((e, idx) => (idx === i ? { ...e, [field]: value } : e)));
+  };
+
+  const addExercise = () => setExercises(prev => [...prev, { name: '', sets: '3', reps: '10' }]);
+  const removeExercise = (i: number) => setExercises(prev => prev.filter((_, idx) => idx !== i));
+
+  const validExercises = exercises.filter(e => e.name.trim().length > 0);
+  const canSave = title.trim().length > 0 && validExercises.length > 0;
+
+  const save = () => {
+    if (!canSave) return;
+    const id = `custom-${Date.now()}`;
+    dispatch({
+      type: 'SAVE_CUSTOM_WORKOUT',
+      payload: {
+        id,
+        title: title.trim(),
+        cardio: false,
+        exercises: validExercises.map(e => ({
+          name: e.name.trim(),
+          sets: Math.max(1, parseInt(e.sets, 10) || 3),
+          reps: e.reps.trim() || '10',
+          muscle: '',
+          instructions: '',
+          mistakes: [],
+          restSeconds: 60,
+        })),
+      },
+    });
+    navigate(-1);
+  };
+
+  return (
+    <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-8">
+      <div className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-xl bg-[var(--bg-primary)]/80">
+        <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+          <ChevronLeft size={24} className="text-[var(--text-primary)]" />
+        </button>
+        <h1 className="text-h3 text-[var(--text-primary)] absolute left-0 right-0 text-center pointer-events-none">Create Workout</h1>
+        <button onClick={save} disabled={!canSave} className={`text-body-sm font-semibold ${canSave ? 'text-[var(--accent-primary)]' : 'text-[var(--text-tertiary)]'}`}>
+          Save
+        </button>
+      </div>
+
+      <div className="px-4 space-y-4">
+        <div>
+          <label className="text-caption text-[var(--text-secondary)] uppercase mb-2 block">Workout Name</label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Push Day, Full Body, Core"
+            className="w-full h-12 px-4 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-transparent focus:border-[var(--accent-primary)] outline-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-caption text-[var(--text-secondary)] uppercase mb-2 block">Exercises</label>
+          <div className="space-y-3">
+            {exercises.map((ex, i) => (
+              <div key={i} className="card !p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={ex.name}
+                    onChange={e => updateExercise(i, 'name', e.target.value)}
+                    placeholder="Exercise name"
+                    className="flex-1 h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-transparent focus:border-[var(--accent-primary)] outline-none"
+                  />
+                  {exercises.length > 1 && (
+                    <button onClick={() => removeExercise(i)} className="p-2 text-[var(--accent-danger)]">
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <span className="text-[10px] text-[var(--text-tertiary)]">Sets</span>
+                    <input
+                      type="number"
+                      min={1}
+                      value={ex.sets}
+                      onChange={e => updateExercise(i, 'sets', e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-transparent focus:border-[var(--accent-primary)] outline-none"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-[10px] text-[var(--text-tertiary)]">Reps</span>
+                    <input
+                      type="text"
+                      value={ex.reps}
+                      onChange={e => updateExercise(i, 'reps', e.target.value)}
+                      placeholder="e.g. 8-12"
+                      className="w-full h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-transparent focus:border-[var(--accent-primary)] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addExercise}
+            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl mt-3 border border-dashed border-[var(--accent-primary)]/40 text-[var(--accent-primary)] font-medium"
+          >
+            <Plus size={16} /> Add Exercise
+          </button>
+        </div>
+
+        <button onClick={save} disabled={!canSave} className="btn-primary" style={{ opacity: canSave ? 1 : 0.5 }}>
+          Save Workout
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function FoodDetail() {
   const { t } = useTranslation();
