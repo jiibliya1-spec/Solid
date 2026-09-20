@@ -227,7 +227,7 @@ export function SettingsScreen() {
         <div className="px-6 pt-2 pb-6">
           <h3 className="text-h3 text-[var(--text-primary)] text-center mb-1">{t('workDaysPerWeek')}</h3>
           <p className="text-body-sm text-[var(--text-secondary)] text-center mb-4">
-            Used to estimate your calorie needs. To choose exactly which days you train and what you do on them, go to Workout → Schedule.
+            {t('workDaysHelpText')}
           </p>
           <div className="flex bg-[var(--bg-tertiary)] rounded-xl p-1">
             {([3, 4] as const).map(n => (
@@ -246,6 +246,13 @@ export function SettingsScreen() {
               </button>
             ))}
           </div>
+          <button
+            onClick={() => { setShowWorkDaysSheet(false); navigate('/workout/schedule'); }}
+            className="w-full mt-3 py-2.5 rounded-xl text-body-sm font-medium text-[var(--accent-primary)] bg-[var(--accent-primary)]/10 flex items-center justify-center gap-2"
+          >
+            <Calendar size={16} />
+            {t('openWorkoutSchedule')}
+          </button>
         </div>
       </BottomSheet>
 
