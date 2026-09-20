@@ -66,6 +66,42 @@
     --water-blue: #38BDF8;
   }
 
+  /* Light theme overrides, applied when the user picks Light in Settings
+     (or Auto follows the system and it's currently light). Previously the
+     theme selector only wrote to state -- there was no light palette at
+     all, so switching to Light did nothing. */
+  :root[data-theme="light"] {
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F4F4F6;
+    --bg-tertiary: #E7E7EC;
+    --bg-elevated: #FFFFFF;
+    --bg-overlay: rgba(0,0,0,0.45);
+
+    --accent-primary: #059669;
+    --accent-primary-light: #34D399;
+    --accent-secondary: #D97706;
+    --accent-secondary-light: #F59E0B;
+    --accent-tertiary: #2563EB;
+    --accent-tertiary-light: #60A5FA;
+    --accent-danger: #DC2626;
+    --accent-danger-light: #EF4444;
+
+    --text-primary: #0A0A0F;
+    --text-secondary: #52525B;
+    --text-tertiary: #8B8B96;
+    --text-accent: #059669;
+
+    --success: #059669;
+    --warning: #D97706;
+    --danger: #DC2626;
+    --info: #2563EB;
+    --water-blue: #0284C7;
+  }
+
+  :root[data-theme="light"] .card {
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
   * {
     -webkit-tap-highlight-color: transparent;
   }

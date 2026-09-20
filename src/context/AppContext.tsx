@@ -255,6 +255,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('fitnessApp', JSON.stringify(state));
   }, [state]);
 
+  // Actually apply the theme the user picked in Settings. Previously
+  // UPDATE_SETTINGS only wrote `theme` into state -- nothing ever read it
+  // back to change what's on screen, so Dark/Light/Auto all looked
+  // identical.
+  useEffect(() => {
+    const theme = state.settings.theme;
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+
+    const applyTheme = () => {
+      const resolved = theme === 'system' ? (media.matches ? 'light' : 'dark') : theme;
+      document.documentElement.setAttribute('data-theme', resolved);
+    };
+
+    applyTheme();
+
+    if (theme === 'system') {
+      media.addEventListener('change', applyTheme);
+      return () => media.removeEventListener('change', applyTheme);
+    }
+  }, [state.settings.theme]);
+
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}
