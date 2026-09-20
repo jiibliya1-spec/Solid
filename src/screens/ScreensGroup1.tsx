@@ -264,7 +264,7 @@ export function Dashboard() {
           <MiniWeightChart measurements={state.measurements} />
           <div className="flex items-center justify-between mt-2">
             <span className="text-body-sm text-[var(--text-secondary)]">
-              {state.measurements[state.measurements.length - 1]?.weight} kg → {state.user?.goalWeight || 78} kg
+              {state.measurements[state.measurements.length - 1]?.weight ?? 0} kg → {state.user?.goalWeight ?? 0} kg
             </span>
             <span className="flex items-center gap-1 text-body-sm text-[var(--accent-primary)]">
               <ArrowDown size={14} /> {Math.abs(Number(weightLost))} kg this week

@@ -461,7 +461,7 @@ export function GoalProjection() {
   const { state } = useApp();
   const navigate = useNavigate();
 
-  const currentWeight = state.measurements[state.measurements.length - 1]?.weight || 88.8;
+  const currentWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0;
   const goalWeight = state.user?.goalWeight || 78;
   const weightLost = (state.user?.currentWeight || 90) - currentWeight;
   const weeksLeft = Math.ceil((currentWeight - goalWeight) / 0.8);

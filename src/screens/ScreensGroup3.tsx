@@ -236,8 +236,13 @@ export function WorkoutDetail() {
         })}
       </div>
 
-      {/* Control bar */}
-      <div className="fixed bottom-16 left-0 right-0 px-4 py-3 bg-[var(--bg-secondary)] border-t border-white/5 z-40">
+      {/* Control bar — pinned just above BottomNav. BottomNav's real height is
+          64px plus the iPhone home-indicator safe area, so this has to account for
+          that too or it visually collides with/hides behind the nav on a real phone. */}
+      <div
+        className="fixed left-0 right-0 px-4 py-3 bg-[var(--bg-secondary)] border-t border-white/5 z-40"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <button
           onClick={completeWorkout}
           className="btn-primary"

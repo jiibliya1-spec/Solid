@@ -8,7 +8,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const getTodayKey = () => format(new Date(), 'yyyy-MM-dd');
 const getDayName = () => DAY_NAMES[getDay(new Date())];
 
-const createInitialDailyLog = (): DailyLog => ({
+const createInitialDailyLog = (startWeight = 0): DailyLog => ({
   date: getTodayKey(),
   calories: 0,
   protein: 0,
@@ -18,7 +18,7 @@ const createInitialDailyLog = (): DailyLog => ({
   water: 0,
   steps: 0,
   sleep: 0,
-  weight: 90,
+  weight: startWeight,
   workoutsCompleted: 0,
   supplementsTaken: 0,
 });
@@ -55,17 +55,9 @@ const getDefaultState = (): AppState => {
         ],
       },
     },
-    measurements: [
-      { date: todayKey, weight: 90, bmi: 26.2, waist: 92, chest: 102, arms: 35, legs: 58, bodyFat: 22 },
-      { date: format(new Date(Date.now() - 86400000), 'yyyy-MM-dd'), weight: 90.2, bmi: 26.3, waist: 92.5, chest: 102, arms: 35, legs: 58, bodyFat: 22.1 },
-      { date: format(new Date(Date.now() - 172800000), 'yyyy-MM-dd'), weight: 90.5, bmi: 26.4, waist: 93, chest: 102, arms: 35, legs: 58, bodyFat: 22.2 },
-      { date: format(new Date(Date.now() - 259200000), 'yyyy-MM-dd'), weight: 90.8, bmi: 26.5, waist: 93.5, chest: 102, arms: 34.8, legs: 58, bodyFat: 22.3 },
-      { date: format(new Date(Date.now() - 345600000), 'yyyy-MM-dd'), weight: 91.0, bmi: 26.5, waist: 94, chest: 102.5, arms: 34.8, legs: 58, bodyFat: 22.4 },
-      { date: format(new Date(Date.now() - 432000000), 'yyyy-MM-dd'), weight: 91.2, bmi: 26.6, waist: 94, chest: 102.5, arms: 34.8, legs: 58, bodyFat: 22.5 },
-      { date: format(new Date(Date.now() - 518400000), 'yyyy-MM-dd'), weight: 91.5, bmi: 26.7, waist: 94.5, chest: 103, arms: 34.7, legs: 58, bodyFat: 22.6 },
-    ],
+    measurements: [],
     recovery: {},
-    streaks: { current: 5, longest: 12, lastActiveDate: todayKey, workoutStreak: 5, nutritionStreak: 5 },
+    streaks: { current: 0, longest: 0, lastActiveDate: todayKey, workoutStreak: 0, nutritionStreak: 0 },
     achievements: DEFAULT_ACHIEVEMENTS.map(a => ({ ...a })),
     supplements: DEFAULT_SUPPLEMENTS.map(s => ({ ...s })),
     settings: {
@@ -80,11 +72,7 @@ const getDefaultState = (): AppState => {
       },
       units: 'metric',
     },
-    notifications: [
-      { id: '1', title: 'Good morning!', message: 'Your calorie target today is 2,350 kcal. Back Day workout scheduled.', time: '7:00 AM', read: false, type: 'morning' },
-      { id: '2', title: 'Time for Back Day!', message: '5 exercises, ~50 minutes. Ready to crush it?', time: '5:00 PM', read: false, type: 'workout' },
-      { id: '3', title: 'Lunch check-in', message: 'You\'ve logged 800 calories. Target: 2,350.', time: '1:00 PM', read: true, type: 'nutrition' },
-    ],
+    notifications: [],
   };
 };
 
@@ -126,8 +114,23 @@ function appReducer(state: AppState, action: Action): AppState {
   const todayKey = getTodayKey();
   
   switch (action.type) {
-    case 'SET_USER':
-      return { ...state, user: action.payload, currentScreen: 'dashboard' };
+    case 'SET_USER': {
+      const weight = action.payload.currentWeight;
+      const heightM = action.payload.height / 100;
+      const bmi = heightM > 0 ? Math.round((weight / (heightM * heightM)) * 10) / 10 : 0;
+      return {
+        ...state,
+        user: action.payload,
+        currentScreen: 'dashboard',
+        dailyLog: { ...state.dailyLog, date: todayKey, weight },
+        // Seed the very first measurement from what the user actually entered during
+        // onboarding, instead of showing fake history. Body-part measurements (waist,
+        // chest, arms, legs, body fat) are left at 0 until the user logs them for real.
+        measurements: state.measurements.length === 0
+          ? [{ date: todayKey, weight, bmi, waist: 0, chest: 0, arms: 0, legs: 0, bodyFat: 0 }]
+          : state.measurements,
+      };
+    }
     case 'SET_SCREEN':
       return { ...state, currentScreen: action.payload };
     case 'UPDATE_DAILY_LOG':

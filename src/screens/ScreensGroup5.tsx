@@ -18,7 +18,7 @@ export function ProgressTracker() {
   const [timeRange, setTimeRange] = useState('1M');
   const [logForm, setLogForm] = useState({ weight: '', waist: '', chest: '', arms: '', legs: '', bodyFat: '' });
 
-  const currentWeight = state.measurements[state.measurements.length - 1]?.weight || 90;
+  const currentWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0;
   const startWeight = state.user?.currentWeight || 90;
   const goalWeight = state.user?.goalWeight || 78;
   const weightLost = (startWeight - currentWeight).toFixed(1);

@@ -695,7 +695,7 @@ export function ProfileScreen() {
         <div className="grid grid-cols-3 gap-3">
           {[
             { label: t('started'), value: `${user?.currentWeight || 90} kg` },
-            { label: t('currentWeight'), value: `${state.measurements[state.measurements.length - 1]?.weight || 88.8} kg`, color: 'var(--accent-primary)' },
+            { label: t('currentWeight'), value: `${state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0} kg`, color: 'var(--accent-primary)' },
             { label: t('goal'), value: `${user?.goalWeight || 78} kg`, color: 'var(--accent-secondary)' },
           ].map((s, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }} className="card text-center !py-3">
