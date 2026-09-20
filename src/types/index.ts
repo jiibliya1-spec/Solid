@@ -70,6 +70,10 @@ export interface FoodItem {
   fat: number;
   fiber: number;
   serving: string;
+  // Optional bucket for the food search filter chips (Protein/Carbs/Vegetables/
+  // Fruits/Dairy). Left undefined for foods added another way (AI photo scan,
+  // manual custom entries) -- those just won't show up under a category filter.
+  category?: 'Protein' | 'Carbs' | 'Vegetables' | 'Fruits' | 'Dairy';
 }
 
 export interface Meal {
