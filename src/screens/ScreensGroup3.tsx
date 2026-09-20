@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import { WORKOUT_SCHEDULE } from '@/types';
 import { BottomNav, BottomSheet, ConfettiCelebration, Toast } from '@/components/SharedComponents';
+import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== WorkoutDetail ====================
@@ -166,6 +167,11 @@ export function WorkoutDetail() {
                     className="overflow-hidden"
                   >
                     <div className="pt-4 space-y-4">
+                      {/* How it's performed -- animated pictogram */}
+                      <div className="w-full h-28 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center">
+                        <ExerciseAnimation name={exercise.name} muscle={exercise.muscle} className="h-24 w-24" />
+                      </div>
+
                       {/* Target muscle */}
                       <div>
                         <span className="text-caption text-[var(--accent-tertiary)]">Target: {exercise.muscle}</span>

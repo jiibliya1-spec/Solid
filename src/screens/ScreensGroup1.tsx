@@ -8,6 +8,7 @@ import { getCardioForWeek, getCurrentWeek, useApp, useDailyTargets } from '@/con
 import type { FoodItem } from '@/types';
 import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE, BUILT_IN_WORKOUTS, REST_WORKOUT_ID, resolveWorkout } from '@/types';
 import { Avatar, BottomNav, BottomSheet, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
+import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== Dashboard ====================
@@ -813,9 +814,9 @@ export function ExerciseDetail() {
       </div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 space-y-4">
-        {/* Hero */}
+        {/* Hero -- animated pictogram of how the exercise is performed */}
         <div className="w-full h-40 rounded-xl bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-tertiary)] flex items-center justify-center">
-          <span className="text-h1 text-[var(--accent-primary)] opacity-30 font-bold">{exercise.name.slice(0, 2).toUpperCase()}</span>
+          <ExerciseAnimation name={exercise.name} muscle={exercise.muscle} className="h-32 w-32" />
         </div>
 
         {/* Muscle tags */}
