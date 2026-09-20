@@ -39,6 +39,22 @@ function matchPattern(name: string, muscle: string): Pattern {
 }
 
 const loop = { duration: 1.3, repeat: Infinity, repeatType: 'reverse' as const, ease: 'easeInOut' as const };
+// Rotating an SVG child by CSS transform needs a pivot point that's stable
+// across the viewBox-to-pixel scaling the browser applies -- percentages or
+// raw viewBox coordinates in transformOrigin don't reliably land on the
+// right spot. The fix: translate a *static* wrapper <g> to the pivot point,
+// then rotate a nested motion.g whose own origin is pinned at local (0,0)
+// (origin "0px 0px" is scale-invariant), with all its children drawn in
+// coordinates relative to that pivot.
+function Pivot({ x, y, from, to, children }: { x: number; y: number; from: number; to: number; children: React.ReactNode }) {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <motion.g style={{ originX: '0px', originY: '0px' } as React.CSSProperties} animate={{ rotate: [from, to] }} transition={loop}>
+        {children}
+      </motion.g>
+    </g>
+  );
+}
 
 // -- Standing figure, arm pivots around the shoulder. Reused for every
 // upper-body isolation/compound move that's performed standing. --
@@ -53,10 +69,10 @@ function StandingArmSwing({ from, to }: { from: number; to: number }) {
       {/* head */}
       <circle cx="50" cy="28" r="7" fill="currentColor" />
       {/* animated arm, pivoting at the shoulder (50,38) */}
-      <motion.g style={{ originX: '50px', originY: '38px' } as React.CSSProperties} animate={{ rotate: [from, to] }} transition={loop}>
-        <line x1="50" y1="38" x2="50" y2="60" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="50" cy="60" r="3.5" fill="currentColor" />
-      </motion.g>
+      <Pivot x={50} y={38} from={from} to={to}>
+        <line x1="0" y1="0" x2="0" y2="22" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="0" cy="22" r="3.5" fill="currentColor" />
+      </Pivot>
     </>
   );
 }
@@ -94,11 +110,11 @@ function HingeFigure() {
     <>
       <line x1="50" y1="60" x2="42" y2="88" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
       <line x1="50" y1="60" x2="58" y2="88" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      <motion.g style={{ originX: '50px', originY: '60px' } as React.CSSProperties} animate={{ rotate: [0, 48] }} transition={loop}>
-        <line x1="50" y1="60" x2="50" y2="35" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="50" cy="28" r="7" fill="currentColor" />
-        <line x1="50" y1="42" x2="50" y2="58" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      </motion.g>
+      <Pivot x={50} y={60} from={0} to={48}>
+        <line x1="0" y1="0" x2="0" y2="-25" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="0" cy="-32" r="7" fill="currentColor" />
+        <line x1="0" y1="-18" x2="0" y2="-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </Pivot>
     </>
   );
 }
@@ -168,10 +184,10 @@ function BenchPressFigure() {
       <line x1="25" y1="68" x2="60" y2="68" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
       <line x1="55" y1="68" x2="50" y2="88" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
       <line x1="60" y1="68" x2="70" y2="88" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-      <motion.g style={{ originX: '45px', originY: '65px' } as React.CSSProperties} animate={{ rotate: [150, 15] }} transition={loop}>
-        <line x1="45" y1="65" x2="45" y2="87" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        <circle cx="45" cy="87" r="4" fill="currentColor" />
-      </motion.g>
+      <Pivot x={45} y={65} from={150} to={15}>
+        <line x1="0" y1="0" x2="0" y2="22" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="0" cy="22" r="4" fill="currentColor" />
+      </Pivot>
     </>
   );
 }
