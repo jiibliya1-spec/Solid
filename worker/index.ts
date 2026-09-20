@@ -87,10 +87,10 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini API error:', geminiRes.status, errText);
-      return new Response(
-        JSON.stringify({ error: 'upstream_error', debug_status: geminiRes.status, debug_body: errText.slice(0, 500) }),
-        { status: 502, headers: corsHeaders() }
-      );
+      return new Response(JSON.stringify({ error: 'upstream_error' }), {
+        status: 502,
+        headers: corsHeaders(),
+      });
     }
 
     const data = (await geminiRes.json()) as {
