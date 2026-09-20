@@ -20,6 +20,7 @@ export function SettingsScreen() {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showAvatarSheet, setShowAvatarSheet] = useState(false);
+  const [showWorkDaysSheet, setShowWorkDaysSheet] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chooseAvatar = (id: string) => {
@@ -93,6 +94,16 @@ export function SettingsScreen() {
           <SettingRow icon={<Target size={18} />} label={t('goalWeight')} value={`${state.user?.goalWeight || 78} kg`} />
           <SettingRow icon={<Ruler size={18} />} label={t('height')} value={`${state.user?.height || 175} cm`} />
           <SettingRow icon={<Calendar size={18} />} label={t('age')} value={`${state.user?.age || 30}`} />
+          <button onClick={() => setShowWorkDaysSheet(true)} className="w-full flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <Activity size={18} className="text-[var(--text-tertiary)]" />
+              <span className="text-body text-[var(--text-primary)]">{t('workDaysPerWeek')}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-body text-[var(--text-secondary)]">{state.user?.workDays || 4} Days</span>
+              <ChevronRight size={16} className="text-[var(--text-tertiary)]" />
+            </div>
+          </button>
         </Section>
 
         {/* Preferences */}
@@ -208,6 +219,33 @@ export function SettingsScreen() {
               {language === lang && <CheckIcon />}
             </button>
           ))}
+        </div>
+      </BottomSheet>
+
+      {/* Training Days Sheet */}
+      <BottomSheet isOpen={showWorkDaysSheet} onClose={() => setShowWorkDaysSheet(false)}>
+        <div className="px-6 pt-2 pb-6">
+          <h3 className="text-h3 text-[var(--text-primary)] text-center mb-1">{t('workDaysPerWeek')}</h3>
+          <p className="text-body-sm text-[var(--text-secondary)] text-center mb-4">
+            Changes today's workout too, unless you've already logged sets for it today.
+          </p>
+          <div className="flex bg-[var(--bg-tertiary)] rounded-xl p-1">
+            {([3, 4] as const).map(n => (
+              <button
+                key={n}
+                onClick={() => {
+                  dispatch({ type: 'UPDATE_USER', payload: { workDays: n } });
+                  setShowWorkDaysSheet(false);
+                  setToast({ visible: true, message: t('save') + '!' });
+                }}
+                className={`flex-1 py-2.5 rounded-lg text-body-sm font-medium transition-all ${
+                  (state.user?.workDays || 4) === n ? 'bg-[var(--accent-primary)] text-white' : 'text-[var(--text-secondary)]'
+                }`}
+              >
+                {n} Days
+              </button>
+            ))}
+          </div>
         </div>
       </BottomSheet>
 

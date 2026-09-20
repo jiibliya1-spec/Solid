@@ -89,6 +89,7 @@ const loadState = (): AppState => {
 
 type Action =
   | { type: 'SET_USER'; payload: User }
+  | { type: 'UPDATE_USER'; payload: Partial<User> }
   | { type: 'SET_SCREEN'; payload: string }
   | { type: 'UPDATE_DAILY_LOG'; payload: Partial<DailyLog> }
   | { type: 'LOG_WATER'; payload: number }
@@ -205,6 +206,38 @@ function appReducer(state: AppState, action: Action): AppState {
           ? [{ date: todayKey, weight, bmi, waist: 0, chest: 0, arms: 0, legs: 0, bodyFat: 0 }]
           : state.measurements,
       };
+    }
+    case 'UPDATE_USER': {
+      if (!state.user) return state;
+      const updatedUser = { ...state.user, ...action.payload };
+
+      // If the training-days-per-week choice changed, today's workout needs
+      // to follow the new schedule -- but only if nothing's actually been
+      // logged against today's workout yet, so changing this setting can
+      // never silently wipe out sets the user already completed.
+      let workoutLog = state.workoutLog;
+      if (action.payload.workDays !== undefined && action.payload.workDays !== state.user.workDays) {
+        const existing = state.workoutLog[todayKey];
+        const hasProgress = existing?.exercises.some(e => e.completedSets.some(s => s.completed)) || existing?.completed;
+        if (!hasProgress) {
+          const dayName = getDayName();
+          const schedule = getWorkoutForDay(dayName, updatedUser.workDays);
+          const workoutEntry: WorkoutEntry = {
+            day: dayName,
+            title: schedule.title,
+            exercises: schedule.exercises.map(e => ({
+              ...e,
+              completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
+            })),
+            completed: false,
+            duration: 0,
+            cardioMinutes: 0,
+          };
+          workoutLog = { ...state.workoutLog, [todayKey]: workoutEntry };
+        }
+      }
+
+      return { ...state, user: updatedUser, workoutLog };
     }
     case 'SET_SCREEN':
       return { ...state, currentScreen: action.payload };
