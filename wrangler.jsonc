@@ -1,0 +1,15 @@
+{
+  // This turns the deployment from a pure static-assets Worker (which
+  // cannot have environment variables/secrets at all -- that's the
+  // "Variables cannot be added to a Worker that only has static assets"
+  // error) into a real Worker with a script (worker/index.ts) that both
+  // serves the built app and handles the /api/analyze-food route.
+  "name": "solid",
+  "compatibility_date": "2026-09-19",
+  "main": "worker/index.ts",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  }
+}
