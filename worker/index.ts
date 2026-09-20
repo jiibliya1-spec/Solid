@@ -21,7 +21,7 @@ interface Env {
   GOOGLE_AI_API_KEY: string;
 }
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-3.6-flash';
 
 const SYSTEM_PROMPT = `You are a nutrition estimation assistant. You will be shown a photo of a meal.
 Identify the food(s) and estimate total nutrition for the visible portion.
