@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { AppState, User, DailyLog, WorkoutEntry, Measurement, RecoveryDay, Supplement, FoodItem } from '@/types';
-import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, WORKOUT_SCHEDULE } from '@/types';
+import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, TRAINING_DAYS_BY_FREQUENCY, getWorkoutForDay } from '@/types';
 import { format, getDay } from 'date-fns';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -26,7 +26,7 @@ const createInitialDailyLog = (startWeight = 0): DailyLog => ({
 const getDefaultState = (): AppState => {
   const todayKey = getTodayKey();
   const dayName = getDayName();
-  const workoutSchedule = WORKOUT_SCHEDULE[dayName] || WORKOUT_SCHEDULE['Monday'];
+  const workoutSchedule = getWorkoutForDay(dayName, 4);
   
   const workoutEntry: WorkoutEntry = {
     day: dayName,
@@ -108,21 +108,96 @@ type Action =
   | { type: 'MARK_NOTIFICATION_READ'; payload: string }
   | { type: 'MARK_ALL_NOTIFICATIONS_READ' }
   | { type: 'UNLOCK_ACHIEVEMENT'; payload: string }
+  | { type: 'ROLL_OVER_DAY' }
   | { type: 'RESET' };
 
 function appReducer(state: AppState, action: Action): AppState {
   const todayKey = getTodayKey();
   
   switch (action.type) {
+    case 'ROLL_OVER_DAY': {
+      // Nothing changed -- we're still on the same calendar day this state was
+      // last touched on, so there's nothing to roll over.
+      if (state.dailyLog.date === todayKey) return state;
+      if (!state.user) return state;
+
+      const dayName = getDayName();
+      const schedule = getWorkoutForDay(dayName, state.user.workDays);
+      const workoutEntry: WorkoutEntry = {
+        day: dayName,
+        title: schedule.title,
+        exercises: schedule.exercises.map(e => ({
+          ...e,
+          completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
+        })),
+        completed: false,
+        duration: 0,
+        cardioMinutes: 0,
+      };
+      const lastWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.dailyLog.weight;
+
+      return {
+        ...state,
+        dailyLog: {
+          date: todayKey,
+          calories: 0,
+          protein: 0,
+          carbs: 0,
+          fat: 0,
+          fiber: 0,
+          water: 0,
+          steps: 0,
+          sleep: 0,
+          weight: lastWeight,
+          workoutsCompleted: 0,
+          supplementsTaken: 0,
+        },
+        workoutLog: { ...state.workoutLog, [todayKey]: state.workoutLog[todayKey] ?? workoutEntry },
+        nutritionLog: {
+          ...state.nutritionLog,
+          [todayKey]: state.nutritionLog[todayKey] ?? {
+            meals: [
+              { name: 'Breakfast', foods: [] },
+              { name: 'Lunch', foods: [] },
+              { name: 'Snack', foods: [] },
+              { name: 'Dinner', foods: [] },
+            ],
+          },
+        },
+      };
+    }
     case 'SET_USER': {
       const weight = action.payload.currentWeight;
       const heightM = action.payload.height / 100;
       const bmi = heightM > 0 ? Math.round((weight / (heightM * heightM)) * 10) / 10 : 0;
+
+      // getDefaultState() had to seed *today's* workout entry before we knew the
+      // user's real workDays choice (they hadn't onboarded yet), so it guessed.
+      // Now that onboarding just gave us the real answer, rebuild today's workout
+      // from the schedule that actually matches it -- otherwise someone who picked
+      // "3 days/week" could be stuck looking at a 5-day template's rest days (e.g.
+      // Sunday always showing as rest even though it should be a training day for
+      // their chosen frequency).
+      const dayName = getDayName();
+      const schedule = getWorkoutForDay(dayName, action.payload.workDays);
+      const workoutEntry: WorkoutEntry = {
+        day: dayName,
+        title: schedule.title,
+        exercises: schedule.exercises.map(e => ({
+          ...e,
+          completedSets: Array(e.sets).fill(null).map(() => ({ reps: 0, weight: 0, completed: false })),
+        })),
+        completed: false,
+        duration: 0,
+        cardioMinutes: 0,
+      };
+
       return {
         ...state,
         user: action.payload,
         currentScreen: 'dashboard',
         dailyLog: { ...state.dailyLog, date: todayKey, weight },
+        workoutLog: { ...state.workoutLog, [todayKey]: workoutEntry },
         // Seed the very first measurement from what the user actually entered during
         // onboarding, instead of showing fake history. Body-part measurements (waist,
         // chest, arms, legs, body fat) are left at 0 until the user logs them for real.
@@ -258,6 +333,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('fitnessApp', JSON.stringify(state));
   }, [state]);
 
+  // Roll over to a fresh day's log/workout when the calendar date has actually
+  // changed since state was last saved -- e.g. the user closed the app
+  // yesterday and opens it again today. Without this, "today" kept showing
+  // whatever day the app was first set up on (stale calories, stale workout,
+  // and a workout day that never matches the real day of the week). Checked
+  // on mount and whenever the app regains focus (covers overnight usage
+  // without needing to keep a timer running).
+  useEffect(() => {
+    dispatch({ type: 'ROLL_OVER_DAY' });
+    const onFocus = () => dispatch({ type: 'ROLL_OVER_DAY' });
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, []);
+
   // Actually apply the theme the user picked in Settings. Previously
   // UPDATE_SETTINGS only wrote `theme` into state -- nothing ever read it
   // back to change what's on screen, so Dark/Light/Auto all looked
@@ -311,7 +404,7 @@ export function useDailyTargets() {
   const height = user?.height || 175;
   const age = user?.age || 30;
   const goalWeight = user?.goalWeight ?? currentWeight;
-  const isTrainingDay = getDayName() !== 'Wednesday' && getDayName() !== 'Sunday';
+  const isTrainingDay = (TRAINING_DAYS_BY_FREQUENCY[user?.workDays ?? 4] ?? TRAINING_DAYS_BY_FREQUENCY[4]).includes(getDayName());
 
   // Mifflin-St Jeor BMR, averaged across the male/female offset since the
   // app doesn't collect gender at onboarding.

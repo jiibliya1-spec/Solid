@@ -291,12 +291,25 @@ export function ProgressRing({
         />
       </svg>
       {(centerText || subText) && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center px-1">
+          {/* Font size scales with the ring's own size instead of a fixed 28px --
+              on a small ring (e.g. the 56-70px ones used for macros) a fixed size
+              made the numbers crowd into / spill over the ring's stroke. */}
           {centerText && (
-            <span className="text-metric text-[var(--text-primary)]">{centerText}</span>
+            <span
+              className="text-[var(--text-primary)] font-bold text-center leading-tight"
+              style={{ fontSize: Math.max(11, Math.round(size * 0.22)), letterSpacing: '-0.02em' }}
+            >
+              {centerText}
+            </span>
           )}
           {subText && (
-            <span className="text-caption text-[var(--text-secondary)]">{subText}</span>
+            <span
+              className="text-[var(--text-secondary)] font-medium text-center leading-tight"
+              style={{ fontSize: Math.max(9, Math.round(size * 0.1)), letterSpacing: '0.02em' }}
+            >
+              {subText}
+            </span>
           )}
         </div>
       )}

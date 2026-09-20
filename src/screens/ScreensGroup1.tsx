@@ -6,7 +6,7 @@ import { Activity, AlertTriangle, ArrowDown, BedDouble, Bell, ChevronLeft, Chevr
 import { addDays, format, startOfWeek } from 'date-fns';
 import { getCardioForWeek, getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
-import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE } from '@/types';
+import { CARDIO_PROGRESSION, WORKOUT_SCHEDULE, getWorkoutForDay } from '@/types';
 import { Avatar, BottomNav, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
@@ -406,7 +406,7 @@ export function WorkoutSchedule() {
         <div className="space-y-2">
           {dayNameKeys.map((dayKey, idx) => {
             const dayName = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][idx];
-            const schedule = WORKOUT_SCHEDULE[dayName];
+            const schedule = getWorkoutForDay(dayName, state.user?.workDays);
             const isToday = format(new Date(), 'EEEE') === dayName && offset === 0;
             const isRest = schedule.exercises.length === 0;
 

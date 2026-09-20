@@ -244,6 +244,35 @@ export const WORKOUT_SCHEDULE: Record<string, { title: string; exercises: Omit<E
   Sunday: { title: 'Recovery / Rest', cardio: false, exercises: [] },
 };
 
+// The 5 real training templates, in a fixed rotation order. Used together
+// with TRAINING_DAYS_BY_FREQUENCY below to build a schedule that actually
+// matches how many days/week the user picked at onboarding -- instead of
+// the fixed Mon-Sat template above (which assumes everyone trains 5
+// days/week and is always off Wednesday+Sunday, regardless of what they
+// chose).
+const WORKOUT_TEMPLATE_ORDER = ['Monday', 'Tuesday', 'Thursday', 'Friday', 'Saturday'];
+
+const REST_TEMPLATE: { title: string; exercises: Omit<Exercise, 'completedSets'>[]; cardio: boolean } = {
+  title: 'Recovery / Rest',
+  cardio: false,
+  exercises: [],
+};
+
+export const TRAINING_DAYS_BY_FREQUENCY: Record<3 | 4, string[]> = {
+  3: ['Monday', 'Wednesday', 'Friday'],
+  4: ['Monday', 'Tuesday', 'Thursday', 'Friday'],
+};
+
+/** Real weekly schedule: which template (or rest) a given day is, based on
+ * how many days/week the user actually chose during onboarding. */
+export function getWorkoutForDay(dayName: string, workDays: 3 | 4 = 4) {
+  const trainingDays = TRAINING_DAYS_BY_FREQUENCY[workDays] ?? TRAINING_DAYS_BY_FREQUENCY[4];
+  const idx = trainingDays.indexOf(dayName);
+  if (idx === -1) return REST_TEMPLATE;
+  const templateKey = WORKOUT_TEMPLATE_ORDER[idx % WORKOUT_TEMPLATE_ORDER.length];
+  return WORKOUT_SCHEDULE[templateKey];
+}
+
 export const CARDIO_PROGRESSION = [
   { weeks: '1-2', minutes: 15 },
   { weeks: '3-4', minutes: 20 },
