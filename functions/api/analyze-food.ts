@@ -1,21 +1,26 @@
 // Cloudflare Pages Function -- deployed automatically alongside the app
 // (any file under /functions maps to a route: this one serves
 // POST /api/analyze-food). This is the real, server-side piece that calls
-// Claude's vision API to analyze a meal photo. It never runs in the
-// browser, so the real ANTHROPIC_API_KEY never reaches the client bundle.
+// Google's Gemini vision API to analyze a meal photo. It never runs in the
+// browser, so the real API key never reaches the client bundle.
 //
-// Setup: in the Cloudflare Pages project -> Settings -> Environment
-// variables, add ANTHROPIC_API_KEY (Production and Preview) with a real
-// Anthropic API key. No other configuration is needed -- src/lib/foodAI.ts
-// already posts to '/api/analyze-food' by default.
+// Setup:
+//   1. Get a free API key from Google AI Studio: https://aistudio.google.com/apikey
+//   2. In the Cloudflare Pages project -> Settings -> Environment variables,
+//      add GOOGLE_AI_API_KEY (Production and Preview) with that key.
+//   3. Save -- Cloudflare redeploys automatically. No other configuration
+//      is needed: src/lib/foodAI.ts already posts to '/api/analyze-food'
+//      by default, which is exactly the route this file serves.
 
 interface Env {
-  ANTHROPIC_API_KEY: string;
+  GOOGLE_AI_API_KEY: string;
 }
 
 interface AnalyzeFoodRequest {
   image: string; // base64-encoded JPEG, no data: prefix
 }
+
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 const SYSTEM_PROMPT = `You are a nutrition estimation assistant. You will be shown a photo of a meal.
 Identify the food(s) and estimate total nutrition for the visible portion.
@@ -40,7 +45,7 @@ export const onRequestOptions: PagesFunction = async () => {
 export const onRequestPost: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
 
-  const apiKey = env.ANTHROPIC_API_KEY;
+  const apiKey = env.GOOGLE_AI_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'server_misconfigured' }), {
       status: 500,
@@ -66,41 +71,41 @@ export const onRequestPost: PagesFunction<Env> = async (context) => {
   }
 
   try {
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 500,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: body.image } },
-              { type: 'text', text: 'Analyze this meal.' },
-            ],
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: `${SYSTEM_PROMPT}\n\nAnalyze this meal.` },
+                { inline_data: { mime_type: 'image/jpeg', data: body.image } },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
           },
-        ],
-      }),
-    });
+        }),
+      }
+    );
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error('Anthropic API error:', anthropicRes.status, errText);
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('Gemini API error:', geminiRes.status, errText);
       return new Response(JSON.stringify({ error: 'upstream_error' }), {
         status: 502,
         headers: corsHeaders(),
       });
     }
 
-    const data = (await anthropicRes.json()) as { content?: { type: string; text?: string }[] };
-    const textBlock = (data.content || []).find((c) => c.type === 'text');
-    const rawText = textBlock?.text || '{}';
+    const data = (await geminiRes.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     const cleaned = rawText.replace(/```json|```/g, '').trim();
 
     let parsed: unknown;
