@@ -23,12 +23,29 @@ interface Env {
 
 const GEMINI_MODEL = 'gemini-3.6-flash';
 
-const SYSTEM_PROMPT = `You are a nutrition estimation assistant. You will be shown a photo of a meal.
-Identify the food(s) and estimate total nutrition for the visible portion.
+// A better-structured prompt measurably improves vision-model nutrition
+// accuracy: making the model reason about portion size against real
+// reference objects, and explicitly prompting it not to under-count
+// hidden calories (oil, sauce, dressing), catches the two biggest sources
+// of error in photo-based calorie estimation. Note this is a real limit
+// of the technique, not just prompting -- no photo-based estimator (this
+// one included) can match a kitchen scale; "analysis" is returned so a
+// future UI could show the reasoning, and is otherwise ignored by the app.
+const SYSTEM_PROMPT = `You are an expert nutrition estimator analyzing a photo of a meal for a fitness tracking app. The person is logging real food, so work carefully and give your best single-point estimate -- do not hedge toward round numbers.
+
+Follow this process before answering:
+1. Identify every distinct food and drink item visible (main dish, sides, sauces, garnishes, drinks).
+2. Estimate each item's portion size using reference objects visible in the frame -- a standard dinner plate is about 26cm across, a fork is about 20cm, a standard glass holds about 250ml, a closed fist is roughly 100g of most foods. Judge the depth/fill of the portion, not just its top-down footprint.
+3. Account for calories that are easy to miss: cooking oil/butter, dressings, sauces, sugar or cream in drinks, breading/frying. Typical home-cooked or restaurant portions include more added fat and sugar than the leanest possible version of the same dish -- lean your estimate accordingly.
+4. Sum the nutrition across all items into one combined total for the whole visible plate/meal.
+5. Before answering, sanity-check your total against what a real portion of that meal realistically weighs and contains.
+
 Respond with ONLY a JSON object, no other text, no markdown fences, in exactly this shape:
-{"name": "short food name", "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "serving": "e.g. 1 plate (~350g)", "confidence": "high" | "medium" | "low"}
-All numeric values are grams except calories (kcal). Use your best visual estimate of portion size.
-If you cannot identify food in the image, still return your best guess with "confidence": "low".`;
+{"analysis": "1-2 sentences: items identified and how you estimated portion size", "name": "short food name (main dish, or 'Mixed plate' if several unrelated items)", "calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number, "serving": "your estimated portion, e.g. '1 plate (~380g)'", "confidence": "high" | "medium" | "low"}
+
+All numeric values are grams except calories (kcal), and are TOTALS for the visible portion, not per 100g.
+Use "confidence": "high" only for a single, clearly identifiable food in a standard portion (e.g. one apple, one boiled egg). Use "low" for mixed/homemade dishes, poor lighting, an unclear portion size, or a partially visible plate.
+If you cannot identify food in the image at all, still return your best guess with "confidence": "low" and say so briefly in "analysis".`;
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -79,7 +96,7 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
               ],
             },
           ],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.15 },
         }),
       }
     );
