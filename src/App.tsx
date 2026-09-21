@@ -1,12 +1,17 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { Dashboard, WorkoutSchedule, CreateWorkout, FoodDetail, ExerciseDetail } from '@/screens/ScreensGroup1';
 import { NutritionHub, Achievements, GoalProjection, Onboarding } from '@/screens/ScreensGroup2';
-import { WorkoutDetail, WorkoutLibrary, MealPlanner, EditFood, BarcodeScanner } from '@/screens/ScreensGroup3';
+import { WorkoutDetail, WorkoutLibrary, MealPlanner, EditFood } from '@/screens/ScreensGroup3';
 import { Setup, AIFoodScanner, NotificationsScreen, ProfileScreen } from '@/screens/ScreensGroup4';
 import { ProgressTracker, AICoach, WeeklyReport } from '@/screens/ScreensGroup5';
 import { SettingsScreen, RecoveryHub, SupplementTracker } from '@/screens/ScreensGroup6';
+
+// Barcode scanning pulls in a real camera decoder library -- lazy-load it so
+// that weight only downloads for people who actually open the scanner.
+const BarcodeScanner = lazy(() => import('@/screens/BarcodeScanner').then(m => ({ default: m.BarcodeScanner })));
 
 function AppRoutes() {
   const { state } = useApp();
@@ -27,7 +32,11 @@ function AppRoutes() {
         <Route path="/nutrition/food/:name" element={state.user ? <FoodDetail /> : <Navigate to="/onboarding" replace />} />
         <Route path="/nutrition/edit/:meal/:index" element={state.user ? <EditFood /> : <Navigate to="/onboarding" replace />} />
         <Route path="/nutrition/planner" element={state.user ? <MealPlanner /> : <Navigate to="/onboarding" replace />} />
-        <Route path="/nutrition/barcode" element={state.user ? <BarcodeScanner /> : <Navigate to="/onboarding" replace />} />
+        <Route path="/nutrition/barcode" element={state.user ? (
+          <Suspense fallback={<div className="h-[100dvh] bg-black" />}>
+            <BarcodeScanner />
+          </Suspense>
+        ) : <Navigate to="/onboarding" replace />} />
         <Route path="/nutrition/ai-scan" element={state.user ? <AIFoodScanner /> : <Navigate to="/onboarding" replace />} />
         <Route path="/achievements" element={state.user ? <Achievements /> : <Navigate to="/onboarding" replace />} />
         <Route path="/ai-coach" element={state.user ? <AICoach /> : <Navigate to="/onboarding" replace />} />

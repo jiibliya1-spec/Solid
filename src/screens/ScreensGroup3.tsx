@@ -2,13 +2,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, ChevronLeft, ChevronRight, Search, Shuffle, Timer, Trash2, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Search, Shuffle, Timer, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import { WORKOUT_SCHEDULE, REST_WORKOUT_ID } from '@/types';
 import type { FoodItem } from '@/types';
 import { QUICK_FOODS } from '@/data/foods';
-import { BottomNav, BottomSheet, ConfettiCelebration, Toast } from '@/components/SharedComponents';
+import { BottomNav, ConfettiCelebration, Toast } from '@/components/SharedComponents';
 import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
 
@@ -670,93 +670,6 @@ export function EditFood() {
           <Trash2 size={16} /> {t('remove')} - {meal}
         </button>
       </motion.div>
-
-      <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
-    </div>
-  );
-}
-
-// ==================== BarcodeScanner ====================
-export function BarcodeScanner() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const { dispatch } = useApp();
-  const [scanning, setScanning] = useState(true);
-  const [showResult, setShowResult] = useState(false);
-  const [toast, setToast] = useState({ visible: false, message: '' });
-
-  useEffect(() => {
-    if (scanning) {
-      const timer = setTimeout(() => {
-        setScanning(false);
-        setShowResult(true);
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [scanning]);
-
-  const addFood = () => {
-    dispatch({
-      type: 'ADD_FOOD',
-      payload: {
-        mealName: 'Snack',
-        food: { name: 'Greek Yogurt 0%', calories: 100, protein: 17, carbs: 6, fat: 0, fiber: 0, serving: '170g' },
-      },
-    });
-    setShowResult(false);
-    setToast({ visible: true, message: `${t('addFood')} - ${t('snack')}` });
-    setTimeout(() => navigate('/nutrition'), 1000);
-  };
-
-  return (
-    <div className="h-[100dvh] bg-black relative flex flex-col items-center justify-center">
-      <button onClick={() => navigate(-1)} className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
-        <X size={20} className="text-white" />
-      </button>
-
-      <p className="text-body-lg text-white/70 mb-8 absolute top-20">{t('positionBarcode')}</p>
-
-      {/* Scanner frame */}
-      <div className="relative w-64 h-64">
-        <div className="absolute inset-0 border-2 border-[var(--accent-primary)] rounded-lg" />
-        {/* Corner brackets */}
-        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-3 border-l-3 border-[var(--accent-primary)] rounded-tl-lg" />
-        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-3 border-r-3 border-[var(--accent-primary)] rounded-tr-lg" />
-        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-3 border-l-3 border-[var(--accent-primary)] rounded-bl-lg" />
-        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-3 border-r-3 border-[var(--accent-primary)] rounded-br-lg" />
-        {/* Scanning line */}
-        {scanning && (
-          <motion.div
-            animate={{ top: ['0%', '100%', '0%'] }}
-            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="absolute left-0 right-0 h-0.5 bg-[var(--accent-primary)] shadow-lg"
-            style={{ boxShadow: '0 0 8px rgba(52,211,153,0.6)' }}
-          />
-        )}
-      </div>
-
-      <p className="text-body-sm text-white/50 mt-8">{t('simulatingScan')}</p>
-
-      <button
-        onClick={() => { setScanning(false); setShowResult(true); }}
-        className="absolute bottom-8 text-body text-[var(--accent-primary)]"
-      >
-        {t('simulateScan')}
-      </button>
-
-      {/* Result sheet */}
-      <BottomSheet isOpen={showResult} onClose={() => { setShowResult(false); navigate('/nutrition'); }}>
-        <div className="px-6 pt-2 pb-6">
-          <h3 className="text-h3 text-[var(--text-primary)] mb-4">Greek Yogurt 0%</h3>
-          <div className="space-y-2 mb-4">
-            <div className="flex justify-between text-body"><span className="text-[var(--text-secondary)]">{t('calories')}</span><span className="text-[var(--text-primary)]">100 kcal</span></div>
-            <div className="flex justify-between text-body"><span className="text-[var(--text-secondary)]">{t('protein')}</span><span className="text-[var(--accent-primary)]">17g</span></div>
-            <div className="flex justify-between text-body"><span className="text-[var(--text-secondary)]">{t('carbs')}</span><span className="text-[var(--text-tertiary)]">6g</span></div>
-            <div className="flex justify-between text-body"><span className="text-[var(--text-secondary)]">{t('fat')}</span><span className="text-[var(--text-tertiary)]">0g</span></div>
-          </div>
-          <button onClick={addFood} className="btn-primary">{t('addToSnack')}</button>
-        </div>
-      </BottomSheet>
 
       <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
     </div>
