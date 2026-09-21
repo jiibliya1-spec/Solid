@@ -3,7 +3,28 @@ import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Loader2, RefreshCw, X } from 'lucide-react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { NotFoundException } from '@zxing/library';
+import { BarcodeFormat, DecodeHintType, NotFoundException } from '@zxing/library';
+
+// Restrict to the barcode formats actually printed on groceries/products
+// (skip 2D formats like QR/DataMatrix), and turn on TRY_HARDER -- zxing's
+// default (fast-but-shallow) decode pass often misses real-world barcodes
+// that are slightly blurry, at an angle, or poorly lit.
+const HINTS = new Map<DecodeHintType, unknown>([
+  [
+    DecodeHintType.POSSIBLE_FORMATS,
+    [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.ITF,
+    ],
+  ],
+  [DecodeHintType.TRY_HARDER, true],
+]);
 import { useApp } from '@/context/AppContext';
 import { Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
@@ -35,10 +56,21 @@ export function BarcodeScanner() {
   const startScanning = useCallback(async () => {
     setPhase('starting');
     handledCodeRef.current = null;
-    if (!readerRef.current) readerRef.current = new BrowserMultiFormatReader();
+    if (!readerRef.current) readerRef.current = new BrowserMultiFormatReader(HINTS);
     try {
       const controls = await readerRef.current.decodeFromConstraints(
-        { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false },
+        {
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            // Best-effort: not all browsers support these, but on the ones
+            // that do (mobile Safari/Chrome) they meaningfully improve
+            // close-up barcode focus. Ignored where unsupported.
+            ...({ advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints),
+          },
+          audio: false,
+        },
         videoRef.current ?? undefined,
         (result, err) => {
           setPhase(p => (p === 'starting' ? 'live' : p));
