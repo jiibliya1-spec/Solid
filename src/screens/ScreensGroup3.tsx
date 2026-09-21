@@ -121,8 +121,8 @@ export function WorkoutDetail() {
         </p>
       </div>
 
-      {/* Exercise List */}
-      <div className="px-4 space-y-3">
+      {/* Exercise Grid */}
+      <div className="px-4 grid grid-cols-2 gap-3">
         {workout.exercises.map((exercise, exIdx) => {
           const isExpanded = expandedIdx === exIdx;
           const completedCount = exercise.completedSets.filter(s => s.completed).length;
@@ -132,30 +132,35 @@ export function WorkoutDetail() {
             <motion.div
               key={exIdx}
               layout
-              className="card overflow-hidden"
+              className={`card overflow-hidden ${isExpanded ? 'col-span-2' : ''}`}
               style={{ borderLeft: allDone ? '3px solid var(--accent-primary)' : undefined }}
             >
-              {/* Collapsed header */}
+              {/* Collapsed header -- grid-card thumbnail */}
               <div
                 onClick={() => setExpandedIdx(isExpanded ? null : exIdx)}
-                className="flex items-center gap-3 cursor-pointer"
+                className="cursor-pointer"
               >
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold ${
-                  allDone ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-                }`}>
-                  {allDone ? <Check size={14} /> : exIdx + 1}
+                <div className="relative w-full aspect-square rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center overflow-hidden mb-2">
+                  <ExerciseAnimation name={exercise.name} muscle={exercise.muscle} className="w-4/5 h-4/5" />
+                  <div className={`absolute top-2 ltr:left-2 rtl:right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
+                    allDone ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-primary)]/80 text-[var(--text-secondary)]'
+                  }`}>
+                    {allDone ? <Check size={14} /> : exIdx + 1}
+                  </div>
+                  {isExpanded && (
+                    <div className="absolute top-2 ltr:right-2 rtl:left-2 w-6 h-6 rounded-full bg-[var(--bg-primary)]/80 flex items-center justify-center">
+                      <motion.div animate={{ rotate: 90 }} transition={{ duration: 0.2 }}>
+                        <ChevronRight size={14} className="text-[var(--text-secondary)]" />
+                      </motion.div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1">
-                  <p className={`text-body font-medium ${allDone ? 'text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'}`}>
-                    {exercise.name}
-                  </p>
-                  <p className="text-caption text-[var(--text-secondary)]">
-                    {exercise.sets} sets × {exercise.reps} reps · {completedCount}/{exercise.sets} done
-                  </p>
-                </div>
-                <motion.div animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.2 }}>
-                  <ChevronRight size={18} className="text-[var(--text-tertiary)]" />
-                </motion.div>
+                <p className={`text-body-sm font-medium text-center leading-tight ${allDone ? 'text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'}`}>
+                  {exercise.name}
+                </p>
+                <p className="text-caption text-[var(--text-secondary)] text-center">
+                  {completedCount}/{exercise.sets} sets
+                </p>
               </div>
 
               {/* Expanded content */}
@@ -168,12 +173,7 @@ export function WorkoutDetail() {
                     transition={{ duration: 0.25 }}
                     className="overflow-hidden"
                   >
-                    <div className="pt-4 space-y-4">
-                      {/* How it's performed -- animated pictogram */}
-                      <div className="w-full h-28 rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center">
-                        <ExerciseAnimation name={exercise.name} muscle={exercise.muscle} className="h-24 w-24" />
-                      </div>
-
+                    <div className="pt-3 space-y-4">
                       {/* Target muscle */}
                       <div>
                         <span className="text-caption text-[var(--accent-tertiary)]">Target: {exercise.muscle}</span>
@@ -364,7 +364,7 @@ export function WorkoutLibrary() {
         </div>
       </div>
 
-      <div className="px-4 mt-3 space-y-2">
+      <div className="px-4 mt-3 grid grid-cols-2 gap-3">
         {filtered.map((ex, i) => (
           <motion.div
             key={i}
@@ -372,24 +372,17 @@ export function WorkoutLibrary() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
             onClick={() => navigate(`/workout/exercise/${encodeURIComponent(ex.name)}`)}
-            className="card flex items-center gap-4 cursor-pointer active:scale-[0.98] transition-transform"
+            className="card flex flex-col items-center text-center gap-2 cursor-pointer active:scale-[0.98] transition-transform"
           >
-            <div className="w-16 h-12 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center shrink-0">
-              <span className="text-caption text-[var(--accent-primary)] font-bold">
-                {MUSCLE_MAP[ex.name]?.slice(0, 3).toUpperCase() || 'EX'}
-              </span>
+            <div className="w-full aspect-square rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center overflow-hidden">
+              <ExerciseAnimation name={ex.name} muscle={ex.muscle} className="w-4/5 h-4/5" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-body font-medium text-[var(--text-primary)] truncate">{ex.name}</p>
-              <div className="flex gap-1 mt-0.5">
-                <span className="chip" style={{ height: 22, padding: '0 8px', fontSize: 10 }}>{ex.muscle}</span>
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-[var(--text-tertiary)] shrink-0" />
+            <p className="text-body-sm font-medium text-[var(--text-primary)] leading-tight">{ex.name}</p>
+            <span className="chip" style={{ height: 22, padding: '0 8px', fontSize: 10 }}>{ex.muscle}</span>
           </motion.div>
         ))}
         {filtered.length === 0 && (
-          <p className="text-center text-body text-[var(--text-tertiary)] py-8">{t('noExercisesFound')}</p>
+          <p className="col-span-2 text-center text-body text-[var(--text-tertiary)] py-8">{t('noExercisesFound')}</p>
         )}
       </div>
     </div>
