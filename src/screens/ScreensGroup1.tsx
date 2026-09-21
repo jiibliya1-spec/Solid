@@ -334,11 +334,12 @@ function TargetCard({ icon, label, current, target, unit, color, progress }: {
 
 function MiniWeightChart({ measurements }: { measurements: { date: string; weight: number }[] }) {
   const data = measurements.slice(-7);
+  if (data.length === 0) return <div className="w-full h-20" />;
   const min = Math.min(...data.map(d => d.weight)) - 0.5;
   const max = Math.max(...data.map(d => d.weight)) + 0.5;
-  const range = max - min;
+  const range = max - min || 1;
   const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * 100;
+    const x = (data.length > 1 ? i / (data.length - 1) : 0.5) * 100;
     const y = 100 - ((d.weight - min) / range) * 100;
     return `${x},${y}`;
   }).join(' ');

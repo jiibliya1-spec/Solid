@@ -114,11 +114,11 @@ export function ProgressTracker() {
   const viewingPhoto = state.progressPhotos.find(p => p.id === viewingPhotoId) || null;
 
   const measurements = state.measurements;
-  const minW = Math.min(...measurements.map(m => m.weight)) - 1;
-  const maxW = Math.max(...measurements.map(m => m.weight)) + 1;
-  const range = maxW - minW;
+  const minW = measurements.length ? Math.min(...measurements.map(m => m.weight)) - 1 : 0;
+  const maxW = measurements.length ? Math.max(...measurements.map(m => m.weight)) + 1 : 1;
+  const range = maxW - minW || 1;
   const chartPoints = measurements.map((m, i) => {
-    const x = (i / (measurements.length - 1)) * 100;
+    const x = (measurements.length > 1 ? i / (measurements.length - 1) : 0.5) * 100;
     const y = 100 - ((m.weight - minW) / range) * 100;
     return `${x},${y}`;
   }).join(' ');
@@ -196,7 +196,7 @@ export function ProgressTracker() {
             <polygon points={`0,100 ${chartPoints} 100,100`} fill="url(#chartGrad)" />
             <polyline points={chartPoints} fill="none" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             {measurements.map((m, i) => {
-              const x = (i / (measurements.length - 1)) * 100;
+              const x = (measurements.length > 1 ? i / (measurements.length - 1) : 0.5) * 100;
               const y = 100 - ((m.weight - minW) / range) * 100;
               return <circle key={i} cx={x} cy={y} r={i === measurements.length - 1 ? 2 : 1} fill={i === measurements.length - 1 ? '#34D399' : 'transparent'} stroke="#34D399" strokeWidth="0.3" />;
             })}
