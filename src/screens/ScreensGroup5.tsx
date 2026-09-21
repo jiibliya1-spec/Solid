@@ -459,6 +459,16 @@ export function AICoach() {
     sendMessage(input.trim());
   };
 
+  const showCoachInfo = () => {
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      sender: 'coach',
+      text: "I'm your AI coach — I use your logged workouts, meals, recovery and measurements to answer questions and suggest adjustments to your plan. Ask me anything about your progress.",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      type: 'normal',
+    }]);
+  };
+
   return (
     <div className="h-[100dvh] bg-[var(--bg-primary)] flex flex-col">
       {/* Header */}
@@ -476,7 +486,7 @@ export function AICoach() {
             <span className="text-caption text-[var(--accent-primary)]">{t('onlineStatus')}</span>
           </div>
         </div>
-        <button className="p-2">
+        <button onClick={showCoachInfo} className="p-2">
           <Info size={20} className="text-[var(--text-secondary)]" />
         </button>
       </div>
@@ -615,6 +625,21 @@ function generateCoachResponse(userMsg: string, state: ReturnType<typeof useApp>
 export function WeeklyReport() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [toast, setToast] = useState({ visible: false, message: '' });
+
+  const shareReport = async () => {
+    const shareText = `${t('weeklyReport')}: -0.8 kg this week, 5/5 workouts, 96% nutrition adherence.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: t('weeklyReport'), text: shareText });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        setToast({ visible: true, message: 'Copied to clipboard' });
+      }
+    } catch {
+      // user cancelled the native share sheet -- not an error
+    }
+  };
 
   const summaryCards = [
     { icon: <TrendingDown size={18} />, value: '-0.8 kg', label: t('thisWeek'), color: 'var(--accent-primary)' },
@@ -640,7 +665,7 @@ export function WeeklyReport() {
           <ChevronLeft size={24} className="text-[var(--text-primary)]" />
         </button>
         <h1 className="text-h3 text-[var(--text-primary)] absolute left-0 right-0 text-center pointer-events-none">{t('weeklyReport')}</h1>
-        <button onClick={() => {}} className="p-1">
+        <button onClick={shareReport} className="p-1">
           <Share2 size={20} className="text-[var(--accent-primary)]" />
         </button>
       </div>
@@ -729,10 +754,12 @@ export function WeeklyReport() {
           </div>
         </motion.div>
 
-        <button className="btn-primary flex items-center justify-center gap-2">
+        <button onClick={shareReport} className="btn-primary flex items-center justify-center gap-2">
           <Share2 size={18} /> Share Weekly Report
         </button>
       </div>
+
+      <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
     </div>
   );
 }
