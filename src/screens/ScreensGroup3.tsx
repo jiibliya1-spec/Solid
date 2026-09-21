@@ -12,6 +12,50 @@ import { BottomNav, ConfettiCelebration, Toast } from '@/components/SharedCompon
 import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
 
+// Static photo thumbnails (cropped from the user's own reference image) replace
+// the animated SVG pictogram for most exercises. A few have no good photo match
+// in the source image, so they keep the animated ExerciseAnimation fallback.
+const EXERCISE_PHOTO_SLUGS: Record<string, string> = {
+  'Shoulder Press': 'shoulder-press',
+  'Lateral Raise': 'lateral-raise',
+  'Rear Delt Fly': 'rear-delt-fly',
+  'Lat Pulldown': 'lat-pulldown',
+  'Seated Cable Row': 'seated-cable-row',
+  'Chest Supported Row': 'chest-supported-row',
+  'Straight Arm Pulldown': 'straight-arm-pulldown',
+  'Face Pull': 'face-pull',
+  'Bench Press': 'bench-press',
+  'Incline Dumbbell Press': 'incline-dumbbell-press',
+  'Chest Fly': 'chest-fly',
+  'Push Ups': 'push-ups',
+  'Squat': 'squat',
+  'Romanian Deadlift': 'romanian-deadlift',
+  'Leg Press': 'leg-press',
+  'Leg Curl': 'leg-curl',
+  'Leg Extension': 'leg-extension',
+  'Standing Calf Raise': 'standing-calf-raise',
+  'Barbell Curl': 'barbell-curl',
+  'Hammer Curl': 'hammer-curl',
+  'Cable Curl': 'cable-curl',
+  'Overhead Extension': 'overhead-extension',
+  'Dips': 'dips',
+  // Upright Row, Shrugs, Triceps Pushdown have no photo match and keep the SVG.
+};
+
+function ExerciseThumbnail({ name, muscle, className }: { name: string; muscle: string; className?: string }) {
+  const slug = EXERCISE_PHOTO_SLUGS[name];
+  if (slug) {
+    return (
+      <img
+        src={`/images/exercises/${slug}.jpg`}
+        alt={name}
+        className={`${className || ''} object-cover rounded-xl`}
+      />
+    );
+  }
+  return <ExerciseAnimation name={name} muscle={muscle} className={className} />;
+}
+
 // ==================== WorkoutDetail ====================
 export function WorkoutDetail() {
   const { t } = useTranslation();
@@ -141,7 +185,7 @@ export function WorkoutDetail() {
                 className="cursor-pointer"
               >
                 <div className="relative w-full aspect-square rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center overflow-hidden mb-2">
-                  <ExerciseAnimation name={exercise.name} muscle={exercise.muscle} className="w-4/5 h-4/5" />
+                  <ExerciseThumbnail name={exercise.name} muscle={exercise.muscle} className="w-4/5 h-4/5" />
                   <div className={`absolute top-2 ltr:left-2 rtl:right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold ${
                     allDone ? 'bg-[var(--accent-primary)] text-white' : 'bg-[var(--bg-primary)]/80 text-[var(--text-secondary)]'
                   }`}>
@@ -375,7 +419,7 @@ export function WorkoutLibrary() {
             className="card flex flex-col items-center text-center gap-2 cursor-pointer active:scale-[0.98] transition-transform"
           >
             <div className="w-full aspect-square rounded-xl bg-[var(--bg-tertiary)] flex items-center justify-center overflow-hidden">
-              <ExerciseAnimation name={ex.name} muscle={ex.muscle} className="w-4/5 h-4/5" />
+              <ExerciseThumbnail name={ex.name} muscle={ex.muscle} className="w-4/5 h-4/5" />
             </div>
             <p className="text-body-sm font-medium text-[var(--text-primary)] leading-tight">{ex.name}</p>
             <span className="chip" style={{ height: 22, padding: '0 8px', fontSize: 10 }}>{ex.muscle}</span>
