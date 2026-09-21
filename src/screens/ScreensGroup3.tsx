@@ -1,11 +1,13 @@
 // Merged screen file — combines: WorkoutDetail, WorkoutLibrary, MealPlanner, EditFood, BarcodeScanner
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, ChevronLeft, ChevronRight, Search, Shuffle, Timer, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
-import { WORKOUT_SCHEDULE } from '@/types';
+import { WORKOUT_SCHEDULE, REST_WORKOUT_ID } from '@/types';
+import type { FoodItem } from '@/types';
+import { QUICK_FOODS } from '@/data/foods';
 import { BottomNav, BottomSheet, ConfettiCelebration, Toast } from '@/components/SharedComponents';
 import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
@@ -395,46 +397,113 @@ export function WorkoutLibrary() {
 }
 
 // ==================== MealPlanner ====================
-const MEAL_PLANS: Record<string, { dayKey: string; typeKey: string; meals: { nameKey: string; items: string; cals: number; p: number; c: number; f: number }[] }> = {
-  'Mon': {
-    dayKey: 'monday', typeKey: 'trainingDay',
-    meals: [
-      { nameKey: 'breakfast', items: 'Scrambled Eggs (3) + Whole Wheat Toast (2) + Banana', cals: 650, p: 35, c: 55, f: 25 },
-      { nameKey: 'lunch', items: 'Grilled Chicken Breast (200g) + Rice (150g) + Vegetables', cals: 720, p: 55, c: 65, f: 12 },
-      { nameKey: 'snack', items: 'Whey Protein Shake + Protein Waffle', cals: 380, p: 30, c: 25, f: 8 },
-      { nameKey: 'dinner', items: 'Salmon (150g) + Air Fryer Potatoes + Salad', cals: 580, p: 38, c: 45, f: 22 },
-    ],
-  },
-  'Tue': {
-    dayKey: 'tuesday', typeKey: 'trainingDay',
-    meals: [
-      { nameKey: 'breakfast', items: 'Oatmeal + Whey Protein + Berries', cals: 520, p: 30, c: 60, f: 10 },
-      { nameKey: 'lunch', items: 'Lean Beef Kofta + Rice + Vegetables', cals: 680, p: 45, c: 55, f: 25 },
-      { nameKey: 'snack', items: 'Greek Yogurt + Banana + Almonds', cals: 350, p: 18, c: 35, f: 14 },
-      { nameKey: 'dinner', items: 'Chicken Breast + Sweet Potato + Broccoli', cals: 620, p: 42, c: 50, f: 15 },
-    ],
-  },
-  'Wed': {
-    dayKey: 'wednesday', typeKey: 'restDay',
-    meals: [
-      { nameKey: 'breakfast', items: 'Protein Waffle + Eggs (2) + Coffee', cals: 450, p: 25, c: 35, f: 20 },
-      { nameKey: 'lunch', items: 'Tuna Salad + Whole Wheat Toast', cals: 480, p: 35, c: 30, f: 15 },
-      { nameKey: 'snack', items: 'Apple + Almond Butter', cals: 280, p: 6, c: 25, f: 18 },
-      { nameKey: 'dinner', items: 'Grilled Fish + Vegetables + Rice', cals: 520, p: 32, c: 45, f: 12 },
-    ],
-  },
-};
+// Builds an actual meal suggestion from the real food database (@/data/foods)
+// instead of a handful of hardcoded example meals. It's a *suggestion* tool
+// (like the old placeholder was meant to be) -- it doesn't log anything to
+// the user's diary on its own; Shuffle/Generieren just re-roll the picks.
+const MEAL_SLOTS: { nameKey: string; ratio: number; categories: string[] }[] = [
+  { nameKey: 'breakfast', ratio: 0.25, categories: ['Carbs', 'Protein', 'Dairy', 'Fruits'] },
+  { nameKey: 'lunch', ratio: 0.35, categories: ['Protein', 'Carbs', 'Vegetables'] },
+  { nameKey: 'snack', ratio: 0.15, categories: ['Fruits', 'Dairy', 'Protein'] },
+  { nameKey: 'dinner', ratio: 0.25, categories: ['Protein', 'Carbs', 'Vegetables'] },
+];
+
+const DAY_ORDER = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_TO_FULL: Record<string, string> = { Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday', Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday' };
+const DAY_TO_KEY: Record<string, string> = { Mon: 'monday', Tue: 'tuesday', Wed: 'wednesday', Thu: 'thursday', Fri: 'friday', Sat: 'saturday', Sun: 'sunday' };
+
+// Small deterministic RNG so a day's suggestion stays put across re-renders
+// (switching tabs, coming back to the screen) and only changes when the
+// person actually taps Shuffle or Generieren.
+function makeRng(seed: number) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+
+type PlannedItem = { food: FoodItem; qty: number };
+type PlannedMeal = { nameKey: string; items: PlannedItem[] };
+
+function generateMeal(rng: () => number, slot: (typeof MEAL_SLOTS)[number], targetCals: number): PlannedMeal {
+  const pool = QUICK_FOODS.filter(f => slot.categories.includes(f.category || ''));
+  const pickCount = pool.length ? 2 + Math.floor(rng() * 2) : 0; // 2-3 items
+  const items: PlannedItem[] = [];
+  let runningCals = 0;
+  for (let i = 0; i < pickCount; i++) {
+    const food = pool[Math.floor(rng() * pool.length)];
+    const remaining = Math.max(targetCals - runningCals, targetCals * 0.2);
+    const share = remaining / (pickCount - i);
+    const rawMultiplier = food.calories > 0 ? share / food.calories : 1;
+    const multiplier = Math.min(Math.max(rawMultiplier, 0.5), 3);
+    const qty = Math.round(multiplier * 2) / 2; // nearest 0.5x serving
+    items.push({ food, qty });
+    runningCals += food.calories * qty;
+  }
+  return { nameKey: slot.nameKey, items };
+}
+
+function generateDayPlan(daySeed: number, dailyCalories: number): PlannedMeal[] {
+  const rng = makeRng(daySeed);
+  return MEAL_SLOTS.map(slot => generateMeal(rng, slot, dailyCalories * slot.ratio));
+}
+
+function formatQty(food: FoodItem, qty: number): string {
+  if (qty === 1) return food.serving;
+  const m = food.serving.match(/^(\d+(?:\.\d+)?)\s*(g|ml)$/);
+  if (m) {
+    const val = Math.round(parseFloat(m[1]) * qty);
+    return `${val}${m[2]}`;
+  }
+  return `${qty}× ${food.serving}`;
+}
+
+function mealTotals(meal: PlannedMeal) {
+  return meal.items.reduce(
+    (acc, { food, qty }) => ({
+      cals: acc.cals + food.calories * qty,
+      p: acc.p + food.protein * qty,
+      c: acc.c + food.carbs * qty,
+      f: acc.f + food.fat * qty,
+    }),
+    { cals: 0, p: 0, c: 0, f: 0 }
+  );
+}
 
 export function MealPlanner() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { state } = useApp();
   const targets = useDailyTargets();
   const [activeDay, setActiveDay] = useState('Mon');
-  const plan = MEAL_PLANS[activeDay] || MEAL_PLANS['Mon'];
-  const totalCals = plan.meals.reduce((s, m) => s + m.cals, 0);
-  const totalP = plan.meals.reduce((s, m) => s + m.p, 0);
-  const totalC = plan.meals.reduce((s, m) => s + m.c, 0);
-  const totalF = plan.meals.reduce((s, m) => s + m.f, 0);
+  // Bumped per-day to force a fresh random plan; keeps each day's suggestion
+  // stable until Shuffle (this day) or Generieren (whole week) is pressed.
+  const [seedVersion, setSeedVersion] = useState<Record<string, number>>({});
+
+  const dayMeals = useMemo(() => {
+    const version = seedVersion[activeDay] ?? 0;
+    const daySeed = (DAY_ORDER.indexOf(activeDay) + 1) * 97 + version * 7919 + 13;
+    return generateDayPlan(daySeed, targets.calories);
+  }, [activeDay, seedVersion, targets.calories]);
+
+  const isRestDay = (state.weeklySchedule[DAY_TO_FULL[activeDay]] ?? REST_WORKOUT_ID) === REST_WORKOUT_ID;
+
+  const totals = dayMeals.reduce(
+    (acc, meal) => {
+      const mt = mealTotals(meal);
+      return { cals: acc.cals + mt.cals, p: acc.p + mt.p, c: acc.c + mt.c, f: acc.f + mt.f };
+    },
+    { cals: 0, p: 0, c: 0, f: 0 }
+  );
+
+  const shuffleDay = () => setSeedVersion(v => ({ ...v, [activeDay]: (v[activeDay] ?? 0) + 1 }));
+  const generateWeek = () =>
+    setSeedVersion(v => {
+      const next = { ...v };
+      DAY_ORDER.forEach(d => {
+        next[d] = (next[d] ?? 0) + 1;
+      });
+      return next;
+    });
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-8">
@@ -453,7 +522,7 @@ export function MealPlanner() {
       {/* Day Selector */}
       <div className="px-4 mt-2">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
+          {DAY_ORDER.map(d => (
             <button key={d} onClick={() => setActiveDay(d)} className={`chip ${activeDay === d ? 'chip-active' : ''}`}>
               {d}
             </button>
@@ -462,7 +531,7 @@ export function MealPlanner() {
       </div>
 
       <motion.div
-        key={activeDay}
+        key={activeDay + '-' + (seedVersion[activeDay] ?? 0)}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="px-4 mt-4 space-y-3"
@@ -470,35 +539,42 @@ export function MealPlanner() {
         <div className="card">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <h3 className="text-h3 text-[var(--text-primary)]">{t(plan.dayKey as any)}</h3>
-              <span className="text-caption text-[var(--accent-primary)]">{t(plan.typeKey as any)}</span>
+              <h3 className="text-h3 text-[var(--text-primary)]">{t(DAY_TO_KEY[activeDay] as any)}</h3>
+              <span className="text-caption text-[var(--accent-primary)]">{t(isRestDay ? 'restDay' : 'trainingDay')}</span>
             </div>
-            <button className="flex items-center gap-1 text-body-sm text-[var(--accent-primary)]">
+            <button onClick={shuffleDay} className="flex items-center gap-1 text-body-sm text-[var(--accent-primary)]">
               <Shuffle size={14} /> {t('shuffle')}
             </button>
           </div>
 
-          {plan.meals.map((meal, i) => (
-            <div key={i} className="py-3 border-b border-white/5 last:border-0">
-              <p className="text-body font-medium text-[var(--text-primary)]">{t(meal.nameKey as any)}</p>
-              <p className="text-body-sm text-[var(--text-secondary)] mt-1">{meal.items}</p>
-              <p className="text-caption text-[var(--text-tertiary)] mt-1">
-                {meal.cals} {t('calories')} · P:{meal.p}g · C:{meal.c}g · F:{meal.f}g
-              </p>
-            </div>
-          ))}
+          {dayMeals.map((meal, i) => {
+            const mt = mealTotals(meal);
+            return (
+              <div key={i} className="py-3 border-b border-white/5 last:border-0">
+                <p className="text-body font-medium text-[var(--text-primary)]">{t(meal.nameKey as any)}</p>
+                <p className="text-body-sm text-[var(--text-secondary)] mt-1">
+                  {meal.items.length
+                    ? meal.items.map(({ food, qty }) => `${food.name} (${formatQty(food, qty)})`).join(' + ')
+                    : t('noData')}
+                </p>
+                <p className="text-caption text-[var(--text-tertiary)] mt-1">
+                  {Math.round(mt.cals)} {t('calories')} · P:{Math.round(mt.p)}g · C:{Math.round(mt.c)}g · F:{Math.round(mt.f)}g
+                </p>
+              </div>
+            );
+          })}
 
           <div className="mt-3 pt-3 border-t border-white/5">
             <p className="text-body-sm text-[var(--accent-primary)]">
-              {t('calories')}: {totalCals} · P:{totalP}g · C:{totalC}g · F:{totalF}g
-              {Math.abs(totalCals - targets.calories) < 100 && ' ✓ ' + t('onTrack')}
+              {t('calories')}: {Math.round(totals.cals)} · P:{Math.round(totals.p)}g · C:{Math.round(totals.c)}g · F:{Math.round(totals.f)}g
+              {Math.abs(totals.cals - targets.calories) < 150 && ' ✓ ' + t('onTrack')}
             </p>
           </div>
         </div>
       </motion.div>
 
       <div className="px-4 mt-4">
-        <button className="btn-primary flex items-center justify-center gap-2">
+        <button onClick={generateWeek} className="btn-primary flex items-center justify-center gap-2">
           <Shuffle size={18} /> {t('generate')}
         </button>
       </div>

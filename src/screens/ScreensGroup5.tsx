@@ -17,6 +17,8 @@ export function ProgressTracker() {
   const [toast, setToast] = useState({ visible: false, message: '' });
   const [timeRange, setTimeRange] = useState('1M');
   const [logForm, setLogForm] = useState({ weight: '', waist: '', chest: '', arms: '', legs: '', bodyFat: '' });
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
 
   const currentWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0;
   const startWeight = state.user?.currentWeight || 90;
@@ -48,6 +50,68 @@ export function ProgressTracker() {
     setToast({ visible: true, message: 'Measurement logged!' });
     setLogForm({ weight: '', waist: '', chest: '', arms: '', legs: '', bodyFat: '' });
   };
+
+  // Resize + JPEG-compress a picked photo client-side before storing it as a
+  // data URL. Progress photos are the only thing in this app's storage that
+  // could realistically be big enough to blow the localStorage quota, so we
+  // keep them small (max 800px, ~70% quality -- plenty for a small grid tile
+  // and a full-screen preview on a phone).
+  const compressPhoto = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error);
+      reader.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('image load failed'));
+        img.onload = () => {
+          const maxDim = 800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return reject(new Error('no canvas context'));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = reader.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handlePhotoFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    for (const file of Array.from(files)) {
+      try {
+        const dataUrl = await compressPhoto(file);
+        dispatch({
+          type: 'ADD_PROGRESS_PHOTO',
+          payload: { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, date: format(new Date(), 'yyyy-MM-dd'), dataUrl },
+        });
+        setToast({ visible: true, message: t('photoAdded') });
+      } catch {
+        setToast({ visible: true, message: t('photoUploadFailed') });
+      }
+    }
+  };
+
+  const deleteViewingPhoto = () => {
+    if (!viewingPhotoId) return;
+    dispatch({ type: 'DELETE_PROGRESS_PHOTO', payload: viewingPhotoId });
+    setViewingPhotoId(null);
+    setToast({ visible: true, message: t('photoDeleted') });
+  };
+
+  const viewingPhoto = state.progressPhotos.find(p => p.id === viewingPhotoId) || null;
 
   const measurements = state.measurements;
   const minW = Math.min(...measurements.map(m => m.weight)) - 1;
@@ -181,18 +245,42 @@ export function ProgressTracker() {
           </div>
         </div>
 
-        {/* Progress Photos placeholder */}
+        {/* Progress Photos */}
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-h3 text-[var(--text-primary)]">{t('progressPhotos')}</h3>
-            <Camera size={18} className="text-[var(--accent-primary)]" />
+            <button onClick={() => photoInputRef.current?.click()} className="p-1">
+              <Camera size={18} className="text-[var(--accent-primary)]" />
+            </button>
           </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            multiple
+            className="hidden"
+            onChange={e => {
+              handlePhotoFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
           <div className="grid grid-cols-3 gap-2">
-            {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="aspect-square rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-                <Camera size={20} className="text-[var(--text-tertiary)]" />
-              </div>
+            {state.progressPhotos.map(photo => (
+              <button
+                key={photo.id}
+                onClick={() => setViewingPhotoId(photo.id)}
+                className="aspect-square rounded-lg overflow-hidden bg-[var(--bg-tertiary)]"
+              >
+                <img src={photo.dataUrl} alt={photo.date} className="w-full h-full object-cover" />
+              </button>
             ))}
+            <button
+              onClick={() => photoInputRef.current?.click()}
+              className="aspect-square rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center"
+            >
+              <Camera size={20} className="text-[var(--text-tertiary)]" />
+            </button>
           </div>
         </div>
 
@@ -249,6 +337,24 @@ export function ProgressTracker() {
           ))}
           <button onClick={saveMeasurement} className="btn-primary">{t('saveMeasurement')}</button>
         </div>
+      </BottomSheet>
+
+      {/* Photo viewer / delete sheet */}
+      <BottomSheet isOpen={!!viewingPhoto} onClose={() => setViewingPhotoId(null)}>
+        {viewingPhoto && (
+          <div className="px-6 pt-2 pb-6 space-y-4">
+            <img src={viewingPhoto.dataUrl} alt={viewingPhoto.date} className="w-full rounded-xl object-cover" />
+            <p className="text-body-sm text-[var(--text-secondary)] text-center">{viewingPhoto.date}</p>
+            <button
+              onClick={() => {
+                if (window.confirm(t('confirmDeletePhoto'))) deleteViewingPhoto();
+              }}
+              className="btn-secondary w-full text-[var(--accent-secondary)]"
+            >
+              {t('deletePhoto')}
+            </button>
+          </div>
+        )}
       </BottomSheet>
 
       <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />

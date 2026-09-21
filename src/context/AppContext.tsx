@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, User, DailyLog, WorkoutEntry, Measurement, RecoveryDay, Supplement, FoodItem, WorkoutTemplate } from '@/types';
+import type { AppState, User, DailyLog, WorkoutEntry, Measurement, ProgressPhoto, RecoveryDay, Supplement, FoodItem, WorkoutTemplate } from '@/types';
 import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, REST_WORKOUT_ID, defaultWeeklySchedule, resolveWorkout } from '@/types';
 import { format, getDay } from 'date-fns';
 
@@ -62,6 +62,7 @@ const getDefaultState = (): AppState => {
       },
     },
     measurements: [],
+    progressPhotos: [],
     recovery: {},
     streaks: { current: 0, longest: 0, lastActiveDate: todayKey, workoutStreak: 0, nutritionStreak: 0 },
     achievements: DEFAULT_ACHIEVEMENTS.map(a => ({ ...a })),
@@ -112,6 +113,8 @@ type Action =
   | { type: 'COMPLETE_WORKOUT' }
   | { type: 'LOG_WEIGHT'; payload: number }
   | { type: 'ADD_MEASUREMENT'; payload: Measurement }
+  | { type: 'ADD_PROGRESS_PHOTO'; payload: ProgressPhoto }
+  | { type: 'DELETE_PROGRESS_PHOTO'; payload: string }
   | { type: 'LOG_RECOVERY'; payload: RecoveryDay }
   | { type: 'TOGGLE_SUPPLEMENT'; payload: string }
   | { type: 'ADD_SUPPLEMENT'; payload: Supplement }
@@ -338,6 +341,10 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'ADD_MEASUREMENT':
       return { ...state, measurements: [...state.measurements, action.payload] };
+    case 'ADD_PROGRESS_PHOTO':
+      return { ...state, progressPhotos: [action.payload, ...state.progressPhotos] };
+    case 'DELETE_PROGRESS_PHOTO':
+      return { ...state, progressPhotos: state.progressPhotos.filter(p => p.id !== action.payload) };
     case 'LOG_RECOVERY':
       return { ...state, recovery: { ...state.recovery, [todayKey]: action.payload } };
     case 'TOGGLE_SUPPLEMENT': {
@@ -378,7 +385,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, undefined, loadState);
 
   useEffect(() => {
-    localStorage.setItem('fitnessApp', JSON.stringify(state));
+    try {
+      localStorage.setItem('fitnessApp', JSON.stringify(state));
+    } catch {
+      // Quota exceeded (most likely too many/too large progress photos).
+      // Don't crash the whole app over it -- the in-memory state is still
+      // fine for this session, it just won't persist across a reload.
+    }
   }, [state]);
 
   // Roll over to a fresh day's log/workout when the calendar date has actually

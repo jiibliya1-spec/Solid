@@ -96,6 +96,13 @@ export interface Measurement {
   bodyFat: number;
 }
 
+export interface ProgressPhoto {
+  id: string;
+  date: string;
+  /** Compressed JPEG data URL, resized client-side before storage. */
+  dataUrl: string;
+}
+
 export interface RecoveryDay {
   date: string;
   sleepHours: number;
@@ -151,6 +158,7 @@ export interface AppState {
   workoutLog: { [date: string]: WorkoutEntry };
   nutritionLog: { [date: string]: NutritionDay };
   measurements: Measurement[];
+  progressPhotos: ProgressPhoto[];
   recovery: { [date: string]: RecoveryDay };
   streaks: Streaks;
   achievements: Achievement[];
