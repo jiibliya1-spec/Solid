@@ -1,7 +1,9 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import type { AppState, User, DailyLog, WorkoutEntry, Measurement, ProgressPhoto, RecoveryDay, Supplement, FoodItem, WorkoutTemplate, AppNotification } from '@/types';
 import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, REST_WORKOUT_ID, defaultWeeklySchedule, resolveWorkout } from '@/types';
 import { format, getDay } from 'date-fns';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabaseClient';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -125,6 +127,7 @@ type Action =
   | { type: 'MARK_ALL_NOTIFICATIONS_READ' }
   | { type: 'UNLOCK_ACHIEVEMENT'; payload: string }
   | { type: 'ROLL_OVER_DAY' }
+  | { type: 'HYDRATE_STATE'; payload: AppState }
   | { type: 'RESET' };
 
 function appReducer(state: AppState, action: Action): AppState {
@@ -409,6 +412,11 @@ function appReducer(state: AppState, action: Action): AppState {
         notifications: [notification, ...state.notifications],
       };
     }
+    case 'HYDRATE_STATE':
+      // Full-state replace after pulling a returning account's data down
+      // from the cloud -- the cloud row becomes this device's state
+      // wholesale, the same way a fresh localStorage read would.
+      return action.payload;
     case 'RESET':
       localStorage.removeItem('fitnessApp');
       return getDefaultState();
@@ -426,6 +434,10 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, undefined, loadState);
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const handledUserIdRef = useRef<string | null>(null);
+  const hydratedForUserRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -505,6 +517,74 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return () => media.removeEventListener('change', applyTheme);
     }
   }, [state.settings.theme]);
+
+  // Cloud sync (only for real accounts -- guests stay local-only). The
+  // localStorage write above always happens regardless of auth mode, so
+  // it keeps working as an offline cache even for a signed-in user.
+  //
+  // When a user id first appears (fresh sign-in on this device), pull
+  // their cloud row down and replace local state with it wholesale --
+  // the cloud is the source of truth for a *returning* account. If no
+  // cloud row exists yet, this is a brand-new account (or a guest who
+  // just signed up), so push whatever is currently in local/guest state
+  // up as their first cloud row instead of wiping it.
+  useEffect(() => {
+    if (!userId) {
+      handledUserIdRef.current = null;
+      return;
+    }
+    if (handledUserIdRef.current === userId) return;
+    handledUserIdRef.current = userId;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('app_state')
+          .select('state')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) {
+          console.error('Could not load cloud data', error);
+          return;
+        }
+        if (data?.state) {
+          dispatch({ type: 'HYDRATE_STATE', payload: data.state as AppState });
+        } else {
+          await supabase
+            .from('app_state')
+            .upsert({ user_id: userId, state, updated_at: new Date().toISOString() });
+        }
+        hydratedForUserRef.current = userId;
+      } catch (err) {
+        console.error('Cloud sync failed', err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  // Debounced push of every subsequent local change up to the cloud, once
+  // the initial hydrate/seed above has actually happened for this user --
+  // otherwise the very first render (still holding stale pre-hydrate
+  // state) could overwrite a returning account's real cloud data before
+  // HYDRATE_STATE has had a chance to land.
+  useEffect(() => {
+    if (!userId || hydratedForUserRef.current !== userId) return;
+    const handle = setTimeout(() => {
+      supabase
+        .from('app_state')
+        .upsert({ user_id: userId, state, updated_at: new Date().toISOString() })
+        .then(({ error }: { error: unknown }) => {
+          if (error) console.error('Cloud sync failed', error);
+        });
+    }, 1500);
+    return () => clearTimeout(handle);
+  }, [state, userId]);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
