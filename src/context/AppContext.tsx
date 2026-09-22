@@ -108,6 +108,7 @@ type Action =
   | { type: 'LOG_STEPS'; payload: number }
   | { type: 'ADD_FOOD'; payload: { mealName: string; food: FoodItem } }
   | { type: 'REMOVE_FOOD'; payload: { mealName: string; foodIndex: number } }
+  | { type: 'UPDATE_FOOD'; payload: { mealName: string; foodIndex: number; targetMealName: string; food: FoodItem } }
   | { type: 'TOGGLE_SET'; payload: { exerciseIndex: number; setIndex: number } }
   | { type: 'UPDATE_SET'; payload: { exerciseIndex: number; setIndex: number; field: 'reps' | 'weight'; value: number } }
   | { type: 'COMPLETE_WORKOUT' }
@@ -297,6 +298,30 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         nutritionLog: { ...state.nutritionLog, [todayKey]: { meals: updatedMeals } },
+        dailyLog: { ...state.dailyLog, calories: totalCals, protein: totalProtein, carbs: totalCarbs, fat: totalFat },
+      };
+    }
+    case 'UPDATE_FOOD': {
+      // Powers the Edit Food screen's quantity slider and "move to meal"
+      // picker -- previously that screen only let you change local component
+      // state and its Save button silently discarded it, showing a success
+      // toast for an edit that was never actually applied.
+      const nutritionDay = state.nutritionLog[todayKey];
+      if (!nutritionDay) return state;
+      const { mealName, foodIndex, targetMealName, food } = action.payload;
+      const withoutOld = nutritionDay.meals.map(m =>
+        m.name === mealName ? { ...m, foods: m.foods.filter((_, fi) => fi !== foodIndex) } : m
+      );
+      const withNew = withoutOld.map(m =>
+        m.name === targetMealName ? { ...m, foods: [...m.foods, food] } : m
+      );
+      const totalCals = withNew.flatMap(m => m.foods).reduce((sum, f) => sum + f.calories, 0);
+      const totalProtein = withNew.flatMap(m => m.foods).reduce((sum, f) => sum + f.protein, 0);
+      const totalCarbs = withNew.flatMap(m => m.foods).reduce((sum, f) => sum + f.carbs, 0);
+      const totalFat = withNew.flatMap(m => m.foods).reduce((sum, f) => sum + f.fat, 0);
+      return {
+        ...state,
+        nutritionLog: { ...state.nutritionLog, [todayKey]: { meals: withNew } },
         dailyLog: { ...state.dailyLog, calories: totalCals, protein: totalProtein, carbs: totalCarbs, fat: totalFat },
       };
     }

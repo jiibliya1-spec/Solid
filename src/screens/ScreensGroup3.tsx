@@ -605,6 +605,28 @@ export function EditFood() {
     setTimeout(() => navigate('/nutrition'), 800);
   };
 
+  const saveChanges = () => {
+    // Previously this just showed a success toast without dispatching
+    // anything -- the quantity slider and "move to meal" picker were fully
+    // interactive but Save silently discarded both. Now it actually applies
+    // the multiplier shown in the preview above and moves the entry if a
+    // different meal was picked.
+    const updatedFood: FoodItem = {
+      ...foodItem,
+      calories: Math.round(foodItem.calories * multiplier),
+      protein: Math.round(foodItem.protein * multiplier * 10) / 10,
+      carbs: Math.round(foodItem.carbs * multiplier * 10) / 10,
+      fat: Math.round(foodItem.fat * multiplier * 10) / 10,
+      fiber: Math.round((foodItem.fiber || 0) * multiplier * 10) / 10,
+    };
+    dispatch({
+      type: 'UPDATE_FOOD',
+      payload: { mealName: meal || '', foodIndex: Number(index), targetMealName: targetMeal, food: updatedFood },
+    });
+    setToast({ visible: true, message: t('changesSaved') });
+    setTimeout(() => navigate('/nutrition'), 500);
+  };
+
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-8">
       <div className="sticky top-0 z-40 px-4 py-3 flex items-center backdrop-blur-xl bg-[var(--bg-primary)]/80">
@@ -655,7 +677,7 @@ export function EditFood() {
           </div>
         </div>
 
-        <button onClick={() => { setToast({ visible: true, message: t('changesSaved') }); setTimeout(() => navigate('/nutrition'), 500); }} className="btn-primary">
+        <button onClick={saveChanges} className="btn-primary">
           {t('save')}
         </button>
 
