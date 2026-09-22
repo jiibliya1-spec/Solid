@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle, Apple, BarChart3, Camera, ChevronLeft, Dumbbell, Flame, Loader2, LogOut, Moon, Pill, RefreshCw, Settings, Sparkles, Sun, Trash2, Trophy, X } from 'lucide-react';
 import { addWeeks, format } from 'date-fns';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import { FoodAIError, analyzeFoodImage, type FoodAnalysis } from '@/lib/foodAI';
 import type { User } from '@/types';
 import { Avatar, BottomSheet, Toast } from '@/components/SharedComponents';
@@ -667,21 +668,27 @@ export function NotificationsScreen() {
 export function ProfileScreen() {
   const { t } = useTranslation();
   const { state, dispatch } = useApp();
+  const { authMode, signOut: authSignOut } = useAuth();
   const navigate = useNavigate();
   const user = state.user;
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const isAccount = authMode === 'account';
 
-  // This app has no server-side account -- there's nothing to "sign out" of
-  // except the locally stored profile. Previously this button navigated to
-  // /onboarding while state.user was still set, and the router's own guard
-  // (`/onboarding` redirects to `/dashboard` whenever a user exists) bounced
-  // it straight back, so nothing visibly happened. Signing out now actually
-  // clears the local profile (after confirming, since it erases progress),
-  // matching what Settings' "Reset Data" already does.
-  const signOut = () => {
-    dispatch({ type: 'RESET' });
-    setShowSignOutConfirm(false);
-    navigate('/onboarding');
+  // For a real account, the data lives in the cloud, so signing out just
+  // ends the session on this device -- nothing is erased, and the app's
+  // own auth gate (in App.tsx) takes it back to the sign-in screen the
+  // moment the session clears. For a guest (no account, local-only data),
+  // there's nothing to "sign out" of except the locally stored profile, so
+  // signing out clears it instead, same as Settings' "Reset Data".
+  const signOut = async () => {
+    if (isAccount) {
+      await authSignOut();
+      setShowSignOutConfirm(false);
+    } else {
+      dispatch({ type: 'RESET' });
+      setShowSignOutConfirm(false);
+      navigate('/onboarding');
+    }
   };
 
   const links = [
@@ -768,7 +775,11 @@ export function ProfileScreen() {
         <div className="px-6 pt-2 pb-6 text-center">
           <Trash2 size={32} className="text-[var(--accent-danger)] mx-auto mb-3" />
           <h3 className="text-h3 text-[var(--text-primary)] mb-2">{t('signOut')}?</h3>
-          <p className="text-body text-[var(--text-secondary)] mb-6">This app doesn't have online accounts, so signing out erases your local progress, logs, and settings. This action cannot be undone.</p>
+          <p className="text-body text-[var(--text-secondary)] mb-6">
+            {isAccount
+              ? "Your progress is saved to your account, so you can sign back in anytime to pick up right where you left off."
+              : "This app doesn't have online accounts, so signing out erases your local progress, logs, and settings. This action cannot be undone."}
+          </p>
           <button onClick={signOut} className="w-full h-12 rounded-xl bg-[var(--accent-danger)] text-white font-semibold mb-3">
             {t('signOut')}
           </button>
