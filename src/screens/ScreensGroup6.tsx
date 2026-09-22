@@ -369,18 +369,36 @@ function CheckIcon() {
 }
 
 // ==================== RecoveryHub ====================
+const DEFAULT_RECOVERY_FORM = {
+  sleepHours: 7.5,
+  sleepQuality: 4,
+  stressLevel: 3,
+  soreness: { legs: 2, back: 1, chest: 0, shoulders: 3, arms: 0 },
+};
+
 export function RecoveryHub() {
   const { t } = useTranslation();
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const [showLogSheet, setShowLogSheet] = useState(false);
   const [toast, setToast] = useState({ visible: false, message: '' });
-  const [recoveryForm, setRecoveryForm] = useState({
-    sleepHours: 7.5,
-    sleepQuality: 4,
-    stressLevel: 3,
-    soreness: { legs: 2, back: 1, chest: 0, shoulders: 3, arms: 0 },
-  });
+
+  const todayKey = new Date().toISOString().split('T')[0];
+  const loggedToday = state.recovery[todayKey];
+
+  const formFromLog = (log?: RecoveryDay) => log ? {
+    sleepHours: log.sleepHours,
+    sleepQuality: log.sleepQuality,
+    stressLevel: log.stressLevel,
+    soreness: { legs: 0, back: 0, chest: 0, shoulders: 0, arms: 0, ...log.soreness },
+  } : DEFAULT_RECOVERY_FORM;
+
+  const [recoveryForm, setRecoveryForm] = useState(() => formFromLog(loggedToday));
+
+  const openLogSheet = () => {
+    setRecoveryForm(formFromLog(loggedToday));
+    setShowLogSheet(true);
+  };
 
   const avgSoreness =
     (recoveryForm.soreness.legs +
@@ -389,32 +407,56 @@ export function RecoveryHub() {
       recoveryForm.soreness.shoulders +
       recoveryForm.soreness.arms) /
     5;
-  const recoveryScore = Math.round(
+  const formRecoveryScore = Math.round(
     Math.min(recoveryForm.sleepHours / 8, 1) * 40 +
       (recoveryForm.sleepQuality / 5) * 20 +
       (1 - recoveryForm.stressLevel / 5) * 20 +
       (1 - avgSoreness / 4) * 20
   );
-  const scoreColor = recoveryScore >= 80 ? 'var(--accent-primary)' : recoveryScore >= 50 ? 'var(--accent-secondary)' : 'var(--accent-danger)';
-  const scoreLabel = recoveryScore >= 80 ? 'Well Recovered' : recoveryScore >= 50 ? 'Moderate' : 'Needs Rest';
-  const scoreSub = recoveryScore >= 80 ? 'Ready to train hard' : recoveryScore >= 50 ? 'Light training recommended' : 'Prioritize rest today';
+
+  // The hero/sleep/stress cards reflect what's actually been logged today,
+  // not the in-progress edit-sheet draft.
+  const hasLoggedToday = !!loggedToday;
+  const recoveryScore = hasLoggedToday ? loggedToday.recoveryScore : 0;
+  const scoreColor = !hasLoggedToday ? 'var(--text-tertiary)' : recoveryScore >= 80 ? 'var(--accent-primary)' : recoveryScore >= 50 ? 'var(--accent-secondary)' : 'var(--accent-danger)';
+  const scoreLabel = !hasLoggedToday ? 'Not Logged Yet' : recoveryScore >= 80 ? 'Well Recovered' : recoveryScore >= 50 ? 'Moderate' : 'Needs Rest';
+  const scoreSub = !hasLoggedToday ? 'Log today to see your score' : recoveryScore >= 80 ? 'Ready to train hard' : recoveryScore >= 50 ? 'Light training recommended' : 'Prioritize rest today';
+
+  const sleepDiff = hasLoggedToday ? loggedToday.sleepHours - 8 : 0;
+  const stressPct = hasLoggedToday ? Math.min(100, Math.max(0, (loggedToday.stressLevel / 10) * 100)) : 0;
+  const stressTier = !hasLoggedToday ? '' : loggedToday.stressLevel <= 3 ? 'Low Stress' : loggedToday.stressLevel <= 6 ? 'Moderate Stress' : 'High Stress';
 
   const saveRecovery = () => {
-    const todayKey = new Date().toISOString().split('T')[0];
     const recovery: RecoveryDay = {
       date: todayKey,
       sleepHours: recoveryForm.sleepHours,
       sleepQuality: recoveryForm.sleepQuality,
       stressLevel: recoveryForm.stressLevel,
       soreness: recoveryForm.soreness,
-      recoveryScore,
+      recoveryScore: formRecoveryScore,
     };
     dispatch({ type: 'LOG_RECOVERY', payload: recovery });
     setShowLogSheet(false);
     setToast({ visible: true, message: 'Recovery logged successfully!' });
   };
 
-  const muscleGroups = [
+  const muscleGroups = hasLoggedToday
+    ? [
+        { name: 'Legs', value: loggedToday.soreness.legs ?? 0 },
+        { name: 'Back', value: loggedToday.soreness.back ?? 0 },
+        { name: 'Chest', value: loggedToday.soreness.chest ?? 0 },
+        { name: 'Shoulders', value: loggedToday.soreness.shoulders ?? 0 },
+        { name: 'Arms', value: loggedToday.soreness.arms ?? 0 },
+      ]
+    : [
+        { name: 'Legs', value: 0 },
+        { name: 'Back', value: 0 },
+        { name: 'Chest', value: 0 },
+        { name: 'Shoulders', value: 0 },
+        { name: 'Arms', value: 0 },
+      ];
+
+  const formMuscleGroups = [
     { name: 'Legs', value: recoveryForm.soreness.legs },
     { name: 'Back', value: recoveryForm.soreness.back },
     { name: 'Chest', value: recoveryForm.soreness.chest },
@@ -455,17 +497,21 @@ export function RecoveryHub() {
           </div>
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-metric text-[var(--text-primary)]">7.5h</p>
+              <p className="text-metric text-[var(--text-primary)]">{hasLoggedToday ? `${loggedToday.sleepHours}h` : '--'}</p>
               <div className="flex gap-0.5 mt-1">
                 {[1,2,3,4,5].map(s => (
-                  <Star key={s} filled={s <= 4} />
+                  <Star key={s} filled={hasLoggedToday && s <= loggedToday.sleepQuality} />
                 ))}
               </div>
               <p className="text-caption text-[var(--text-secondary)] mt-1">{t('lastNight')}</p>
             </div>
             <div className="flex-1">
               <MiniLineChart color="#60A5FA" />
-              <p className="text-body-sm text-[var(--accent-primary)] mt-1">+0.5h surplus</p>
+              <p className="text-body-sm text-[var(--accent-primary)] mt-1">
+                {hasLoggedToday
+                  ? (sleepDiff >= 0 ? `+${sleepDiff.toFixed(1)}h surplus` : `${sleepDiff.toFixed(1)}h deficit`)
+                  : 'Not logged yet'}
+              </p>
             </div>
           </div>
         </div>
@@ -480,12 +526,14 @@ export function RecoveryHub() {
             <div className="absolute inset-0 rounded-full" style={{ background: 'linear-gradient(90deg, #34D399, #F59E0B, #EF4444)' }} />
             <motion.div
               initial={{ left: 0 }}
-              animate={{ left: '30%' }}
+              animate={{ left: `${stressPct}%` }}
               transition={{ duration: 0.5 }}
               className="absolute top-0 w-0.5 h-full bg-white shadow-lg"
             />
           </div>
-          <p className="text-body-sm text-[var(--accent-primary)] mt-2">3/10 — Low Stress</p>
+          <p className="text-body-sm text-[var(--accent-primary)] mt-2">
+            {hasLoggedToday ? `${loggedToday.stressLevel}/10 — ${stressTier}` : 'Not logged yet'}
+          </p>
         </div>
 
         {/* Soreness */}
@@ -526,8 +574,8 @@ export function RecoveryHub() {
         </div>
 
         {/* Log Button */}
-        <button onClick={() => setShowLogSheet(true)} className="btn-primary">
-          Log Today's Recovery
+        <button onClick={openLogSheet} className="btn-primary">
+          {hasLoggedToday ? "Update Today's Recovery" : "Log Today's Recovery"}
         </button>
       </div>
 
@@ -561,7 +609,7 @@ export function RecoveryHub() {
               className="w-full accent-[var(--accent-primary)]" />
           </div>
 
-          {muscleGroups.map(m => (
+          {formMuscleGroups.map(m => (
             <div key={m.name}>
               <label className="text-caption text-[var(--text-secondary)] uppercase mb-1 block">{m.name} Soreness</label>
               <input type="range" min={0} max={10} step={1} value={recoveryForm.soreness[m.name.toLowerCase() as keyof typeof recoveryForm.soreness]}
