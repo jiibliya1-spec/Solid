@@ -2,12 +2,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AlertTriangle, Apple, BarChart3, Camera, ChevronLeft, Dumbbell, Flame, Loader2, LogOut, Moon, Pill, RefreshCw, Settings, Sparkles, Sun, Trophy, X } from 'lucide-react';
+import { AlertTriangle, Apple, BarChart3, Camera, ChevronLeft, Dumbbell, Flame, Loader2, LogOut, Moon, Pill, RefreshCw, Settings, Sparkles, Sun, Trash2, Trophy, X } from 'lucide-react';
 import { addWeeks, format } from 'date-fns';
 import { useApp } from '@/context/AppContext';
 import { FoodAIError, analyzeFoodImage, type FoodAnalysis } from '@/lib/foodAI';
 import type { User } from '@/types';
-import { Avatar, Toast } from '@/components/SharedComponents';
+import { Avatar, BottomSheet, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== Setup ====================
@@ -666,9 +666,23 @@ export function NotificationsScreen() {
 // ==================== ProfileScreen ====================
 export function ProfileScreen() {
   const { t } = useTranslation();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const user = state.user;
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  // This app has no server-side account -- there's nothing to "sign out" of
+  // except the locally stored profile. Previously this button navigated to
+  // /onboarding while state.user was still set, and the router's own guard
+  // (`/onboarding` redirects to `/dashboard` whenever a user exists) bounced
+  // it straight back, so nothing visibly happened. Signing out now actually
+  // clears the local profile (after confirming, since it erases progress),
+  // matching what Settings' "Reset Data" already does.
+  const signOut = () => {
+    dispatch({ type: 'RESET' });
+    setShowSignOutConfirm(false);
+    navigate('/onboarding');
+  };
 
   const links = [
     { icon: <Settings size={18} />, labelKey: 'settings', screen: '/settings' },
@@ -743,12 +757,24 @@ export function ProfileScreen() {
 
         {/* Sign Out */}
         <button
-          onClick={() => navigate('/onboarding')}
+          onClick={() => setShowSignOutConfirm(true)}
           className="w-full flex items-center justify-center gap-2 py-3 text-body text-[var(--accent-danger)]"
         >
           <LogOut size={18} /> {t('signOut')}
         </button>
       </div>
+
+      <BottomSheet isOpen={showSignOutConfirm} onClose={() => setShowSignOutConfirm(false)} maxHeight="40vh">
+        <div className="px-6 pt-2 pb-6 text-center">
+          <Trash2 size={32} className="text-[var(--accent-danger)] mx-auto mb-3" />
+          <h3 className="text-h3 text-[var(--text-primary)] mb-2">{t('signOut')}?</h3>
+          <p className="text-body text-[var(--text-secondary)] mb-6">This app doesn't have online accounts, so signing out erases your local progress, logs, and settings. This action cannot be undone.</p>
+          <button onClick={signOut} className="w-full h-12 rounded-xl bg-[var(--accent-danger)] text-white font-semibold mb-3">
+            {t('signOut')}
+          </button>
+          <button onClick={() => setShowSignOutConfirm(false)} className="btn-secondary">{t('cancel')}</button>
+        </div>
+      </BottomSheet>
     </div>
   );
 }
