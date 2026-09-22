@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Apple, Camera, ChevronLeft, Clock, Droplets, Flame, Moon, Plus, Scale, ScanLine, Search, Star, Sun, Target, Trophy, Utensils, Zap } from 'lucide-react';
+import { Apple, Bot, Camera, ChevronLeft, Clock, Droplets, Flame, LineChart, Moon, Plus, Scale, ScanLine, Search, Sparkles, Star, Sun, Target, Trophy, Utensils, Zap } from 'lucide-react';
 import { format, getDaysInMonth } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
@@ -586,10 +586,31 @@ export function GoalProjection() {
 }
 
 // ==================== Onboarding ====================
+// No shipped photo assets exist for these slides (the app has none bundled),
+// so each slide is an original in-code illustration instead of an <img> that
+// would 404 through the SPA fallback and silently render as a broken image.
 const pages = [
-  { image: '/images/onboarding-1.jpg', titleKey: 'onboardingSlide1Title' as const, descKey: 'onboardingSlide1Desc' as const },
-  { image: '/images/onboarding-2.jpg', titleKey: 'onboardingSlide2Title' as const, descKey: 'onboardingSlide2Desc' as const },
-  { image: '/images/onboarding-3.jpg', titleKey: 'onboardingSlide3Title' as const, descKey: 'onboardingSlide3Desc' as const },
+  {
+    icon: <LineChart size={64} strokeWidth={1.75} />,
+    gradient: 'linear-gradient(160deg, rgba(96,165,250,0.25) 0%, rgba(96,165,250,0.03) 100%)',
+    accent: '#60A5FA',
+    titleKey: 'onboardingSlide1Title' as const,
+    descKey: 'onboardingSlide1Desc' as const,
+  },
+  {
+    icon: <Apple size={64} strokeWidth={1.75} />,
+    gradient: 'linear-gradient(160deg, rgba(52,211,153,0.25) 0%, rgba(52,211,153,0.03) 100%)',
+    accent: '#34D399',
+    titleKey: 'onboardingSlide2Title' as const,
+    descKey: 'onboardingSlide2Desc' as const,
+  },
+  {
+    icon: <Bot size={64} strokeWidth={1.75} />,
+    gradient: 'linear-gradient(160deg, rgba(245,158,11,0.25) 0%, rgba(245,158,11,0.03) 100%)',
+    accent: '#F59E0B',
+    titleKey: 'onboardingSlide3Title' as const,
+    descKey: 'onboardingSlide3Desc' as const,
+  },
 ];
 
 const swipeVariants = {
@@ -597,6 +618,33 @@ const swipeVariants = {
   center: { x: 0, opacity: 1 },
   exit: (direction: number) => ({ x: direction < 0 ? 300 : -300, opacity: 0 }),
 };
+
+function OnboardingIllustration({ icon, gradient, accent }: { icon: React.ReactNode; gradient: string; accent: string }) {
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center relative"
+      style={{ background: gradient }}
+    >
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-40 h-40 rounded-full border" style={{ borderColor: `${accent}33` }} />
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-28 h-28 rounded-full border" style={{ borderColor: `${accent}4D` }} />
+      </div>
+      <motion.div
+        initial={{ scale: 0.85, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 180, damping: 16 }}
+        className="w-20 h-20 rounded-full flex items-center justify-center relative"
+        style={{ background: accent, color: '#0B0F14', boxShadow: `0 0 40px ${accent}66` }}
+      >
+        {icon}
+      </motion.div>
+      <Sparkles size={20} className="absolute top-6 right-10" style={{ color: accent, opacity: 0.6 }} />
+      <Sparkles size={14} className="absolute bottom-8 left-8" style={{ color: accent, opacity: 0.4 }} />
+    </div>
+  );
+}
 
 export function Onboarding() {
   const { t } = useTranslation();
@@ -625,10 +673,10 @@ export function Onboarding() {
             className="w-full flex flex-col items-center"
           >
             <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden mb-8 shadow-2xl">
-              <img
-                src={pages[page].image}
-                alt={t(pages[page].titleKey)}
-                className="w-full h-full object-cover"
+              <OnboardingIllustration
+                icon={pages[page].icon}
+                gradient={pages[page].gradient}
+                accent={pages[page].accent}
               />
             </div>
             <h2 className="text-h2 text-[var(--text-primary)] text-center mb-3">
