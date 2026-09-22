@@ -7,7 +7,7 @@ import { format, getDaysInMonth } from 'date-fns';
 import { useApp, useDailyTargets } from '@/context/AppContext';
 import type { FoodItem } from '@/types';
 import { QUICK_FOODS } from '@/data/foods';
-import { BottomNav, BottomSheet, CoachAvatar, ProgressRing, Toast } from '@/components/SharedComponents';
+import { BottomNav, BottomSheet, CoachAvatar, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== NutritionHub ====================
@@ -285,6 +285,7 @@ export function NutritionHub() {
       </BottomSheet>
 
       <BottomNav />
+      <QuickLogFAB />
       <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
     </div>
   );

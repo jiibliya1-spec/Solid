@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Apple, ArrowDown, Camera, Check, ChevronLeft, Flame, Heart, Info, Send, Share2, Target, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
-import { BottomNav, BottomSheet, CoachAvatar, Toast } from '@/components/SharedComponents';
+import { BottomNav, BottomSheet, CoachAvatar, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== ProgressTracker ====================
@@ -311,6 +311,7 @@ export function ProgressTracker() {
       </div>
 
       <BottomNav />
+      <QuickLogFAB />
 
       {/* Log Measurement Sheet */}
       <BottomSheet isOpen={showLogSheet} onClose={() => setShowLogSheet(false)}>

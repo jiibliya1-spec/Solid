@@ -8,7 +8,7 @@ import { useApp, useDailyTargets } from '@/context/AppContext';
 import { WORKOUT_SCHEDULE, REST_WORKOUT_ID } from '@/types';
 import type { FoodItem } from '@/types';
 import { QUICK_FOODS } from '@/data/foods';
-import { BottomNav, ConfettiCelebration, Toast } from '@/components/SharedComponents';
+import { BottomNav, ConfettiCelebration, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { ExerciseAnimation } from '@/components/ExerciseAnimation';
 import { useTranslation } from '@/i18n/i18nHooks';
 
@@ -301,6 +301,7 @@ export function WorkoutDetail() {
       </AnimatePresence>
 
       <BottomNav />
+      <QuickLogFAB />
       <ConfettiCelebration trigger={showCelebration} />
       <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
     </div>

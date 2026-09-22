@@ -6,7 +6,7 @@ import { Activity, BedDouble, Calendar, Camera, Check, ChevronLeft, ChevronRight
 import { useApp } from '@/context/AppContext';
 import type { Language } from '@/i18n/translations';
 import type { RecoveryDay } from '@/types';
-import { AVATAR_PRESETS, Avatar, BottomSheet, ProgressRing, Toast } from '@/components/SharedComponents';
+import { AVATAR_PRESETS, Avatar, BottomNav, BottomSheet, ProgressRing, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { LANGUAGE_NAMES, useLanguage, useTranslation } from '@/i18n/i18nHooks';
 
 // ==================== SettingsScreen ====================
@@ -465,7 +465,7 @@ export function RecoveryHub() {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-8">
+    <div className="min-h-[100dvh] bg-[var(--bg-primary)] pb-24">
       {/* Header */}
       <div className="sticky top-0 z-40 px-4 py-3 flex items-center backdrop-blur-xl bg-[var(--bg-primary)]/80">
         <button onClick={() => navigate(-1)} className="p-2 -ml-2">
@@ -622,6 +622,11 @@ export function RecoveryHub() {
         </div>
       </BottomSheet>
 
+      {/* /recovery is one of the 5 primary tabs (see BottomNav's own tabs
+          list), but this screen never actually rendered the tab bar --
+          landing here left no way to switch tabs except the back button. */}
+      <BottomNav />
+      <QuickLogFAB />
       <Toast message={toast.message} isVisible={toast.visible} onClose={() => setToast({ ...toast, visible: false })} />
     </div>
   );
