@@ -81,6 +81,22 @@ export function Setup() {
 
   const update = (field: keyof User, value: unknown) => setForm(f => ({ ...f, [field]: value }));
 
+  // Review-step preview, mirroring useDailyTargets' formula (that hook reads
+  // state.user, which isn't set until this wizard finishes, so the numbers
+  // shown here are computed directly from the in-progress form instead of
+  // being hardcoded placeholders that never matched what the person entered).
+  const previewWeight = form.currentWeight || 90;
+  const previewBmr = 10 * previewWeight + 6.25 * (form.height || 175) - 5 * (form.age || 30) - 78;
+  const previewTrainingActivity =
+    (form.workDays === 4 ? 1.55 : 1.45) +
+    (form.experience === 'advanced' ? 0.1 : form.experience === 'beginner' ? -0.05 : 0);
+  const previewRestActivity = 1.2;
+  const previewWeightDelta = (form.goalWeight || 78) - previewWeight;
+  const previewCalorieAdjustment = previewWeightDelta < -0.5 ? -500 : previewWeightDelta > 0.5 ? 300 : 0;
+  const trainingDayCalories = Math.round(previewBmr * previewTrainingActivity + previewCalorieAdjustment);
+  const restDayCalories = Math.round(previewBmr * previewRestActivity + previewCalorieAdjustment);
+  const proteinTarget = Math.round(previewWeight * 2);
+
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)] flex flex-col">
       {/* Stepper */}
@@ -232,10 +248,10 @@ export function Setup() {
                   <p className="text-body text-[var(--text-secondary)]">{t('calculatedPlanIntro')}</p>
                 </div>
                 {[
-                  { label: t('trainingDayCaloriesLabel'), value: '2,350 kcal', color: 'var(--accent-secondary)' },
-                  { label: t('restDayCaloriesLabel'), value: '2,050 kcal', color: 'var(--accent-tertiary)' },
-                  { label: t('proteinTargetLabel'), value: '180g', color: 'var(--accent-primary)' },
-                  { label: t('workoutScheduleLabel'), value: '5 days / week', color: 'var(--accent-primary)' },
+                  { label: t('trainingDayCaloriesLabel'), value: `${trainingDayCalories.toLocaleString()} kcal`, color: 'var(--accent-secondary)' },
+                  { label: t('restDayCaloriesLabel'), value: `${restDayCalories.toLocaleString()} kcal`, color: 'var(--accent-tertiary)' },
+                  { label: t('proteinTargetLabel'), value: `${proteinTarget}g`, color: 'var(--accent-primary)' },
+                  { label: t('workoutScheduleLabel'), value: `${form.workDays || 4} days / week`, color: 'var(--accent-primary)' },
                   { label: t('cardioStartLabel'), value: '15 min', color: 'var(--accent-tertiary)' },
                   { label: t('goalDateLabel'), value: format(addWeeks(new Date(), timeline), 'MMM d, yyyy'), color: 'var(--accent-secondary)' },
                 ].map((item, i) => (
@@ -575,8 +591,11 @@ export function NotificationsScreen() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
 
-  const today = state.notifications.filter(n => !n.read || n.time.includes('AM') || n.time.includes('PM'));
-  const earlier = state.notifications.filter(n => n.read);
+  // Notifications only carry a time-of-day string, not an actual date, so
+  // there's no real "today" vs "yesterday" to bucket by -- split by read
+  // status instead, which is the distinction the data can actually support.
+  const unread = state.notifications.filter(n => !n.read);
+  const read = state.notifications.filter(n => n.read);
 
   return (
     <div className="min-h-[100dvh] bg-[var(--bg-primary)]">
@@ -591,7 +610,7 @@ export function NotificationsScreen() {
       </div>
 
       <div className="px-4 space-y-2 mt-2">
-        {today.length === 0 && earlier.length === 0 ? (
+        {unread.length === 0 && read.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className="w-16 h-16 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center mb-4">
               <Sun size={28} className="text-[var(--text-tertiary)]" />
@@ -601,10 +620,10 @@ export function NotificationsScreen() {
           </div>
         ) : (
           <>
-            {today.length > 0 && (
+            {unread.length > 0 && (
               <>
-                <p className="text-caption text-[var(--text-tertiary)] uppercase mb-2">{t('today')}</p>
-                {today.map(n => (
+                <p className="text-caption text-[var(--text-tertiary)] uppercase mb-2">New</p>
+                {unread.map(n => (
                   <motion.div
                     key={n.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -623,10 +642,10 @@ export function NotificationsScreen() {
               </>
             )}
 
-            {earlier.length > 0 && (
+            {read.length > 0 && (
               <>
-                <p className="text-caption text-[var(--text-tertiary)] uppercase mb-2 mt-4">{t('yesterday')}</p>
-                {earlier.map(n => (
+                <p className="text-caption text-[var(--text-tertiary)] uppercase mb-2 mt-4">Earlier</p>
+                {read.map(n => (
                   <motion.div key={n.id} className="card flex items-start gap-3 opacity-60">
                     <div className="mt-0.5">{TYPE_ICONS[n.type]}</div>
                     <div className="flex-1">

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import type { AppState, User, DailyLog, WorkoutEntry, Measurement, ProgressPhoto, RecoveryDay, Supplement, FoodItem, WorkoutTemplate } from '@/types';
+import type { AppState, User, DailyLog, WorkoutEntry, Measurement, ProgressPhoto, RecoveryDay, Supplement, FoodItem, WorkoutTemplate, AppNotification } from '@/types';
 import { DEFAULT_SUPPLEMENTS, DEFAULT_ACHIEVEMENTS, REST_WORKOUT_ID, defaultWeeklySchedule, resolveWorkout } from '@/types';
 import { format, getDay } from 'date-fns';
 
@@ -364,8 +364,26 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, notifications: state.notifications.map(n => n.id === action.payload ? { ...n, read: true } : n) };
     case 'MARK_ALL_NOTIFICATIONS_READ':
       return { ...state, notifications: state.notifications.map(n => ({ ...n, read: true })) };
-    case 'UNLOCK_ACHIEVEMENT':
-      return { ...state, achievements: state.achievements.map(a => a.id === action.payload ? { ...a, unlockedAt: todayKey } : a) };
+    case 'UNLOCK_ACHIEVEMENT': {
+      const achievement = state.achievements.find(a => a.id === action.payload);
+      // No-op for an unknown id or one already unlocked -- keeps this action
+      // safe to dispatch repeatedly from the auto-check effect below without
+      // re-notifying or overwriting the original unlock date.
+      if (!achievement || achievement.unlockedAt) return state;
+      const notification: AppNotification = {
+        id: `achv-${action.payload}-${Date.now()}`,
+        title: achievement.title,
+        message: `Achievement unlocked: ${achievement.title} — ${achievement.description}`,
+        time: format(new Date(), 'h:mm a'),
+        read: false,
+        type: 'achievement',
+      };
+      return {
+        ...state,
+        achievements: state.achievements.map(a => a.id === action.payload ? { ...a, unlockedAt: todayKey } : a),
+        notifications: [notification, ...state.notifications],
+      };
+    }
     case 'RESET':
       localStorage.removeItem('fitnessApp');
       return getDefaultState();
@@ -411,6 +429,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener('visibilitychange', onFocus);
     };
   }, []);
+
+  // Unlock achievements as soon as their real, already-tracked condition is
+  // actually met, instead of leaving UNLOCK_ACHIEVEMENT permanently
+  // undispatched (nothing anywhere else in the app fired it, so every
+  // achievement sat locked forever regardless of what the user did). Limited
+  // to the achievements this app's data model can honestly evaluate --
+  // per-day macro/hydration streaks, time-of-day workout counts, and total
+  // calories burned aren't tracked per entry, so those stay locked rather
+  // than being faked.
+  useEffect(() => {
+    if (!state.user) return;
+    const completedWorkoutDays = Object.values(state.workoutLog).filter(w => w.completed).length;
+    const latestWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.dailyLog.weight;
+    const checks: { id: string; met: boolean }[] = [
+      { id: 'first-workout', met: completedWorkoutDays >= 1 },
+      { id: 'week-warrior', met: completedWorkoutDays >= 7 },
+      { id: 'streak-3', met: state.streaks.current >= 3 },
+      { id: 'streak-7', met: state.streaks.current >= 7 },
+      { id: 'streak-14', met: state.streaks.current >= 14 },
+      { id: 'halfway', met: latestWeight > 0 && latestWeight <= 84 },
+      { id: 'goal-crusher', met: latestWeight > 0 && latestWeight <= 78 },
+    ];
+    for (const { id, met } of checks) {
+      if (!met) continue;
+      const achievement = state.achievements.find(a => a.id === id);
+      if (achievement && !achievement.unlockedAt) {
+        dispatch({ type: 'UNLOCK_ACHIEVEMENT', payload: id });
+      }
+    }
+  }, [state.user, state.workoutLog, state.streaks.current, state.measurements, state.dailyLog.weight, state.achievements]);
 
   // Actually apply the theme the user picked in Settings. Previously
   // UPDATE_SETTINGS only wrote `theme` into state -- nothing ever read it
