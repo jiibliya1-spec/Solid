@@ -355,7 +355,7 @@ function MiniWeightChart({ measurements }: { measurements: { date: string; weigh
       <polygon points={`0,100 ${points} 100,100`} fill="url(#miniGrad)" />
       <polyline points={points} fill="none" stroke="#34D399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       {data.map((d, i) => {
-        const x = (i / (data.length - 1)) * 100;
+        const x = (data.length > 1 ? i / (data.length - 1) : 0.5) * 100;
         const y = 100 - ((d.weight - min) / range) * 100;
         return (
           <circle key={i} cx={x} cy={y} r={i === data.length - 1 ? 2.5 : 1.5} fill={i === data.length - 1 ? '#34D399' : 'transparent'} stroke="#34D399" strokeWidth={0.5} />
