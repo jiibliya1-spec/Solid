@@ -2,6 +2,8 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { AppProvider, useApp } from '@/context/AppContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { AuthScreen } from '@/screens/AuthScreen';
 import { Dashboard, WorkoutSchedule, CreateWorkout, FoodDetail, ExerciseDetail } from '@/screens/ScreensGroup1';
 import { NutritionHub, Achievements, GoalProjection, Onboarding } from '@/screens/ScreensGroup2';
 import { WorkoutDetail, WorkoutLibrary, MealPlanner, EditFood } from '@/screens/ScreensGroup3';
@@ -15,7 +17,28 @@ const BarcodeScanner = lazy(() => import('@/screens/BarcodeScanner').then(m => (
 
 function AppRoutes() {
   const { state } = useApp();
+  const { session, authMode, loading } = useAuth();
   const location = useLocation();
+
+  // Before this feature, the app had no accounts at all -- everything was
+  // local-only and every route only ever checked `state.user` (whether
+  // onboarding had been completed). Now a visitor also has to either be
+  // signed in or have explicitly chosen to continue as a guest before they
+  // can reach any of those routes at all; until then (or while the very
+  // first session check is still in flight) they see the auth screen
+  // instead of the app, regardless of what path they're on.
+  if (loading) {
+    return (
+      <div className="h-[100dvh] w-full flex items-center justify-center bg-[var(--bg-primary)]">
+        <div className="w-8 h-8 rounded-full border-2 border-[var(--accent-primary)] border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  const isAuthed = !!session || authMode === 'guest';
+  if (!isAuthed) {
+    return <AuthScreen />;
+  }
 
   return (
     <AnimatePresence mode="wait">
@@ -56,10 +79,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <div className="app-container">
-        <AppRoutes />
-      </div>
-    </AppProvider>
+    <AuthProvider>
+      <AppProvider>
+        <div className="app-container">
+          <AppRoutes />
+        </div>
+      </AppProvider>
+    </AuthProvider>
   );
 }
