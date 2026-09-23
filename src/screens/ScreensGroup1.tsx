@@ -69,7 +69,7 @@ export function Dashboard() {
         className="sticky top-0 z-40 px-4 py-3 flex items-center justify-between backdrop-blur-xl bg-[var(--bg-primary)]/80"
       >
         <div>
-          <h3 className="text-h3 text-[var(--accent-primary)]">Transform 90→78</h3>
+          <h3 className="text-h3 text-[var(--accent-primary)]">Solid</h3>
           <p className="text-caption text-[var(--text-tertiary)]">Week {week} · Day {Math.min(week * 7, 84)}</p>
         </div>
         <div className="flex items-center gap-3">
