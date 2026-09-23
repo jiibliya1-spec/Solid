@@ -59,7 +59,17 @@ export async function analyzeProgressPhoto(input: ProgressAnalysisInput): Promis
   }
 
   if (!response.ok) {
-    throw new ProgressAIError(`request_failed_${response.status}`);
+    // Try to read the structured { error: '...' } body so callers can tell
+    // a real failure (e.g. the Gemini API key's prepaid credits running
+    // out) apart from a generic network/server hiccup.
+    let code = `request_failed_${response.status}`;
+    try {
+      const errBody = (await response.json()) as { error?: string };
+      if (errBody.error) code = errBody.error;
+    } catch {
+      // body wasn't JSON -- keep the generic code
+    }
+    throw new ProgressAIError(code);
   }
 
   let data: unknown;

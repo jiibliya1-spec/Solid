@@ -20,7 +20,7 @@ export function ProgressTracker() {
   const [logForm, setLogForm] = useState({ weight: '', waist: '', chest: '', arms: '', legs: '', bodyFat: '' });
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
-  const [analysisState, setAnalysisState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [analysisState, setAnalysisState] = useState<'idle' | 'loading' | 'error' | 'billing_exhausted'>('idle');
   const [analysisResult, setAnalysisResult] = useState<ProgressAnalysis | null>(null);
 
   const currentWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0;
@@ -148,8 +148,9 @@ export function ProgressTracker() {
       setAnalysisResult(result);
       setAnalysisState('idle');
     } catch (err) {
-      console.error('Progress analysis failed:', err instanceof ProgressAIError ? err.message : err);
-      setAnalysisState('error');
+      const message = err instanceof ProgressAIError ? err.message : String(err);
+      console.error('Progress analysis failed:', message);
+      setAnalysisState(message === 'billing_exhausted' ? 'billing_exhausted' : 'error');
     }
   };
 
@@ -406,6 +407,12 @@ export function ProgressTracker() {
               <div className="card text-center py-4">
                 <p className="text-body-sm text-[var(--accent-danger)] mb-3">Couldn't analyze that photo right now.</p>
                 <button onClick={runProgressAnalysis} className="btn-secondary">{t('retry')}</button>
+              </div>
+            )}
+
+            {analysisState === 'billing_exhausted' && (
+              <div className="card text-center py-4">
+                <p className="text-body-sm text-[var(--accent-danger)]">AI analysis is temporarily unavailable — the app's AI credits have run out. This needs to be topped up in Google AI Studio, not something you can fix from here.</p>
               </div>
             )}
 

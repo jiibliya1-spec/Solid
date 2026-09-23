@@ -124,12 +124,10 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini API error:', geminiRes.status, errText);
-      // TEMP DEBUG: surfacing the real upstream error/status to the client
-      // to diagnose a live failure. Remove once resolved.
-      return new Response(JSON.stringify({ error: 'upstream_error', debug_status: geminiRes.status, debug_body: errText }), {
-        status: 502,
-        headers: corsHeaders(),
-      });
+      return new Response(
+        JSON.stringify({ error: geminiRes.status === 402 ? 'billing_exhausted' : 'upstream_error' }),
+        { status: 502, headers: corsHeaders() }
+      );
     }
 
     const data = (await geminiRes.json()) as {
@@ -143,7 +141,7 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
       parsed = JSON.parse(cleaned);
     } catch {
       console.error('Could not parse model output as JSON:', rawText);
-      return new Response(JSON.stringify({ error: 'parse_error', debug_raw: rawText }), {
+      return new Response(JSON.stringify({ error: 'parse_error' }), {
         status: 502,
         headers: corsHeaders(),
       });
@@ -152,7 +150,7 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
     return new Response(JSON.stringify(parsed), { status: 200, headers: corsHeaders() });
   } catch (err) {
     console.error('analyze-food handler error:', err);
-    return new Response(JSON.stringify({ error: 'internal_error', debug_err: String(err) }), {
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
       headers: corsHeaders(),
     });
@@ -232,12 +230,10 @@ async function handleAnalyzeProgress(request: Request, apiKey: string): Promise<
     if (!geminiRes.ok) {
       const errText = await geminiRes.text();
       console.error('Gemini API error:', geminiRes.status, errText);
-      // TEMP DEBUG: surfacing the real upstream error/status to the client
-      // to diagnose a live failure. Remove once resolved.
-      return new Response(JSON.stringify({ error: 'upstream_error', debug_status: geminiRes.status, debug_body: errText }), {
-        status: 502,
-        headers: corsHeaders(),
-      });
+      return new Response(
+        JSON.stringify({ error: geminiRes.status === 402 ? 'billing_exhausted' : 'upstream_error' }),
+        { status: 502, headers: corsHeaders() }
+      );
     }
 
     const data = (await geminiRes.json()) as {
@@ -251,7 +247,7 @@ async function handleAnalyzeProgress(request: Request, apiKey: string): Promise<
       parsed = JSON.parse(cleaned);
     } catch {
       console.error('Could not parse model output as JSON:', rawText);
-      return new Response(JSON.stringify({ error: 'parse_error', debug_raw: rawText }), {
+      return new Response(JSON.stringify({ error: 'parse_error' }), {
         status: 502,
         headers: corsHeaders(),
       });
@@ -260,7 +256,7 @@ async function handleAnalyzeProgress(request: Request, apiKey: string): Promise<
     return new Response(JSON.stringify(parsed), { status: 200, headers: corsHeaders() });
   } catch (err) {
     console.error('analyze-progress handler error:', err);
-    return new Response(JSON.stringify({ error: 'internal_error', debug_err: String(err) }), {
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
       status: 500,
       headers: corsHeaders(),
     });
