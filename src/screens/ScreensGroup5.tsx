@@ -2,11 +2,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Apple, ArrowDown, Camera, Check, ChevronLeft, Flame, Heart, Info, Send, Share2, Target, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { Apple, ArrowDown, Camera, Check, ChevronLeft, Flame, Heart, Info, Loader2, Send, Share2, Sparkles, Target, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { getCurrentWeek, useApp, useDailyTargets } from '@/context/AppContext';
 import { BottomNav, BottomSheet, CoachAvatar, QuickLogFAB, Toast } from '@/components/SharedComponents';
 import { useTranslation } from '@/i18n/i18nHooks';
+import { analyzeProgressPhoto, ProgressAIError, type ProgressAnalysis } from '@/lib/progressAI';
 
 // ==================== ProgressTracker ====================
 export function ProgressTracker() {
@@ -19,10 +20,13 @@ export function ProgressTracker() {
   const [logForm, setLogForm] = useState({ weight: '', waist: '', chest: '', arms: '', legs: '', bodyFat: '' });
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [viewingPhotoId, setViewingPhotoId] = useState<string | null>(null);
+  const [analysisState, setAnalysisState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [analysisResult, setAnalysisResult] = useState<ProgressAnalysis | null>(null);
 
   const currentWeight = state.measurements[state.measurements.length - 1]?.weight ?? state.user?.currentWeight ?? 0;
   const startWeight = state.user?.currentWeight || 90;
   const goalWeight = state.user?.goalWeight || 78;
+  const weekNumber = state.user ? getCurrentWeek(state.user.startDate) : 1;
   const weightLost = (startWeight - currentWeight).toFixed(1);
   const remaining = (currentWeight - goalWeight).toFixed(1);
   const progress = Math.min(((startWeight - currentWeight) / (startWeight - goalWeight)) * 100, 100);
@@ -108,10 +112,46 @@ export function ProgressTracker() {
     if (!viewingPhotoId) return;
     dispatch({ type: 'DELETE_PROGRESS_PHOTO', payload: viewingPhotoId });
     setViewingPhotoId(null);
+    setAnalysisState('idle');
+    setAnalysisResult(null);
     setToast({ visible: true, message: t('photoDeleted') });
   };
 
   const viewingPhoto = state.progressPhotos.find(p => p.id === viewingPhotoId) || null;
+  // Photos are stored newest-first (ADD_PROGRESS_PHOTO prepends), so the
+  // last element is the earliest one on file. Only offer it as a
+  // before/after comparison when it's a different photo than the one
+  // being viewed -- comparing a photo against itself isn't useful.
+  const earliestPhoto = state.progressPhotos.length > 1 ? state.progressPhotos[state.progressPhotos.length - 1] : null;
+  const comparisonPhoto = earliestPhoto && earliestPhoto.id !== viewingPhotoId ? earliestPhoto : null;
+
+  const closePhotoViewer = () => {
+    setViewingPhotoId(null);
+    setAnalysisState('idle');
+    setAnalysisResult(null);
+  };
+
+  const runProgressAnalysis = async () => {
+    if (!viewingPhoto) return;
+    setAnalysisState('loading');
+    setAnalysisResult(null);
+    try {
+      const result = await analyzeProgressPhoto({
+        latestImage: viewingPhoto.dataUrl,
+        earliestImage: comparisonPhoto?.dataUrl,
+        startWeight,
+        currentWeight,
+        goalWeight,
+        weeksElapsed: weekNumber,
+        heightCm: state.user?.height,
+      });
+      setAnalysisResult(result);
+      setAnalysisState('idle');
+    } catch (err) {
+      console.error('Progress analysis failed:', err instanceof ProgressAIError ? err.message : err);
+      setAnalysisState('error');
+    }
+  };
 
   const measurements = state.measurements;
   const minW = measurements.length ? Math.min(...measurements.map(m => m.weight)) - 1 : 0;
@@ -295,7 +335,7 @@ export function ProgressTracker() {
                 <div className={`absolute left-0 top-1 w-3 h-3 rounded-full border-2 ${
                   m.done ? 'bg-[var(--accent-primary)] border-[var(--accent-primary)]' : 'bg-[var(--bg-tertiary)] border-[var(--bg-tertiary)]'
                 }`} />
-                <p className={`text-body-sm ${m.done ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} ${m.goal ? 'font-semibold text-[var(--accent-secondary)]' : ''} ${m.highlight ? 'text-[var(--accent-secondary)]' : ''}`}>
+                <p className={`pl-5 text-body-sm ${m.done ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'} ${m.goal ? 'font-semibold text-[var(--accent-secondary)]' : ''} ${m.highlight ? 'text-[var(--accent-secondary)]' : ''}`}>
                   {m.label}
                 </p>
               </div>
@@ -340,11 +380,82 @@ export function ProgressTracker() {
       </BottomSheet>
 
       {/* Photo viewer / delete sheet */}
-      <BottomSheet isOpen={!!viewingPhoto} onClose={() => setViewingPhotoId(null)}>
+      <BottomSheet isOpen={!!viewingPhoto} onClose={closePhotoViewer}>
         {viewingPhoto && (
-          <div className="px-6 pt-2 pb-6 space-y-4">
+          <div className="px-6 pt-2 pb-6 space-y-4 max-h-[80vh] overflow-y-auto">
             <img src={viewingPhoto.dataUrl} alt={viewingPhoto.date} className="w-full rounded-xl object-cover" />
             <p className="text-body-sm text-[var(--text-secondary)] text-center">{viewingPhoto.date}</p>
+
+            {analysisState !== 'idle' || analysisResult ? null : (
+              <button
+                onClick={runProgressAnalysis}
+                className="btn-primary w-full flex items-center justify-center gap-2"
+              >
+                <Sparkles size={18} /> Analyze with AI
+              </button>
+            )}
+
+            {analysisState === 'loading' && (
+              <div className="card flex items-center justify-center gap-2 py-6">
+                <Loader2 size={20} className="text-[var(--accent-primary)] animate-spin" />
+                <span className="text-body-sm text-[var(--text-secondary)]">Analyzing your progress…</span>
+              </div>
+            )}
+
+            {analysisState === 'error' && (
+              <div className="card text-center py-4">
+                <p className="text-body-sm text-[var(--accent-danger)] mb-3">Couldn't analyze that photo right now.</p>
+                <button onClick={runProgressAnalysis} className="btn-secondary">{t('retry')}</button>
+              </div>
+            )}
+
+            {analysisResult && (
+              <div className="space-y-3">
+                <div className="card" style={{ borderLeft: '2px solid var(--accent-primary)' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles size={16} className="text-[var(--accent-primary)]" />
+                    <h3 className="text-h3 text-[var(--text-primary)]">AI Read</h3>
+                  </div>
+                  <p className="text-body-sm text-[var(--text-primary)] leading-relaxed">{analysisResult.summary}</p>
+                </div>
+
+                {analysisResult.improvements.length > 0 && (
+                  <div className="card">
+                    <h3 className="text-body font-medium text-[var(--text-primary)] mb-2">What's improved</h3>
+                    <div className="space-y-2">
+                      {analysisResult.improvements.map((item, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <Check size={16} className="text-[var(--accent-primary)] mt-0.5 shrink-0" />
+                          <span className="text-body-sm text-[var(--text-secondary)]">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysisResult.focusAreas.length > 0 && (
+                  <div className="card">
+                    <h3 className="text-body font-medium text-[var(--text-primary)] mb-2">Focus on next</h3>
+                    <div className="space-y-2">
+                      {analysisResult.focusAreas.map((item, i) => (
+                        <div key={i} className="flex items-start gap-2">
+                          <Target size={16} className="text-[var(--accent-secondary)] mt-0.5 shrink-0" />
+                          <span className="text-body-sm text-[var(--text-secondary)]">{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => { setAnalysisResult(null); setAnalysisState('idle'); }}
+                  className="text-body-sm text-[var(--text-tertiary)] w-full text-center"
+                >
+                  Clear analysis
+                </button>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 if (window.confirm(t('confirmDeletePhoto'))) deleteViewingPhoto();

@@ -1,9 +1,10 @@
 // Cloudflare Worker entry point.
 //
-// Handles POST /api/analyze-food with real server-side logic (calls
-// Google's Gemini vision API to analyze a meal photo), and serves the
-// built static site (Vite's `dist` output, via the ASSETS binding from
-// wrangler.jsonc) for every other route.
+// Handles POST /api/analyze-food and POST /api/analyze-progress with real
+// server-side logic (calls Google's Gemini vision API to analyze a meal
+// photo, or a progress photo against the user's transformation goal), and
+// serves the built static site (Vite's `dist` output, via the ASSETS
+// binding from wrangler.jsonc) for every other route.
 //
 // This replaces functions/api/analyze-food.ts: that file follows the
 // classic Cloudflare Pages Functions convention, which only applies when
@@ -46,6 +47,25 @@ Respond with ONLY a JSON object, no other text, no markdown fences, in exactly t
 All numeric values are grams except calories (kcal), and are TOTALS for the visible portion, not per 100g.
 Use "confidence": "high" only for a single, clearly identifiable food in a standard portion (e.g. one apple, one boiled egg). Use "low" for mixed/homemade dishes, poor lighting, an unclear portion size, or a partially visible plate.
 If you cannot identify food in the image at all, still return your best guess with "confidence": "low" and say so briefly in "analysis".`;
+
+// Reviews a progress photo (optionally against the user's earliest one)
+// alongside their stated stats, and gives a short honest read on visible
+// change plus concrete next-focus suggestions. Kept deliberately
+// encouraging-but-specific rather than generic praise, and explicitly
+// told to stay off medical/diagnostic ground -- this is fitness-coaching
+// commentary, not a body assessment.
+const PROGRESS_SYSTEM_PROMPT = `You are an encouraging but honest fitness coach reviewing a client's transformation progress photo(s) for a fitness tracking app. You are not a doctor -- never diagnose, never comment on health risk, never make claims about body fat percentage or medical status from the photo. Stay focused on fitness-coaching observations: posture, visible muscle tone/definition, and how the photo(s) line up with their stated numbers.
+
+You will be given the client's stats (starting weight, current weight, goal weight, height if known, weeks into the program) and one or two photos:
+- If only ONE photo is provided, it is their most recent progress photo. Base your read on that photo plus their numeric stats -- do not invent a before/after comparison you can't see.
+- If TWO photos are provided, the first is their EARLIEST progress photo and the second is their MOST RECENT one. Compare them directly and be specific about what visibly changed (or note plainly if you can't tell much from the angle/lighting/clothing).
+
+Keep it specific and grounded in what's actually visible or in the numbers -- avoid generic gym-poster language. Be warm and motivating, never critical or body-shaming, and never suggest extreme measures (crash dieting, excessive exercise, etc).
+
+Respond with ONLY a JSON object, no other text, no markdown fences, in exactly this shape:
+{"summary": "2-3 sentence honest overall read combining what's visible and the numbers", "improvements": ["short phrase describing one specific thing that's visibly or numerically improved", "..."], "focusAreas": ["one short, concrete, actionable suggestion for what to prioritize next toward their goal weight", "..."]}
+
+Give 2-4 items in "improvements" (fewer if genuinely little has changed yet -- don't invent progress that isn't there) and 2-4 items in "focusAreas". If there's only one photo and not much to go on yet, say so plainly in "summary" and keep "focusAreas" focused on general next steps toward their stated goal.`;
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -137,6 +157,112 @@ async function handleAnalyzeFood(request: Request, apiKey: string): Promise<Resp
   }
 }
 
+interface AnalyzeProgressBody {
+  latestImage?: string;
+  earliestImage?: string;
+  startWeight?: number;
+  currentWeight?: number;
+  goalWeight?: number;
+  weeksElapsed?: number;
+  heightCm?: number;
+}
+
+async function handleAnalyzeProgress(request: Request, apiKey: string): Promise<Response> {
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: 'server_misconfigured' }), {
+      status: 500,
+      headers: corsHeaders(),
+    });
+  }
+
+  let body: AnalyzeProgressBody;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(JSON.stringify({ error: 'invalid_request' }), {
+      status: 400,
+      headers: corsHeaders(),
+    });
+  }
+
+  if (!body.latestImage) {
+    return new Response(JSON.stringify({ error: 'missing_image' }), {
+      status: 400,
+      headers: corsHeaders(),
+    });
+  }
+
+  const statsLines = [
+    body.startWeight != null ? `Starting weight: ${body.startWeight} kg` : null,
+    body.currentWeight != null ? `Current weight: ${body.currentWeight} kg` : null,
+    body.goalWeight != null ? `Goal weight: ${body.goalWeight} kg` : null,
+    body.heightCm != null ? `Height: ${body.heightCm} cm` : null,
+    body.weeksElapsed != null ? `Weeks into the program: ${body.weeksElapsed}` : null,
+  ].filter(Boolean).join('\n');
+
+  const parts: Array<{ text: string } | { inline_data: { mime_type: string; data: string } }> = [
+    { text: `${PROGRESS_SYSTEM_PROMPT}\n\nClient stats:\n${statsLines || 'Not provided.'}` },
+  ];
+
+  if (body.earliestImage) {
+    parts.push({ text: 'EARLIEST photo:' });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: body.earliestImage } });
+    parts.push({ text: 'MOST RECENT photo:' });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: body.latestImage } });
+  } else {
+    parts.push({ text: 'Most recent (only) photo:' });
+    parts.push({ inline_data: { mime_type: 'image/jpeg', data: body.latestImage } });
+  }
+
+  try {
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.4 },
+        }),
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errText = await geminiRes.text();
+      console.error('Gemini API error:', geminiRes.status, errText);
+      return new Response(JSON.stringify({ error: 'upstream_error' }), {
+        status: 502,
+        headers: corsHeaders(),
+      });
+    }
+
+    const data = (await geminiRes.json()) as {
+      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    };
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const cleaned = rawText.replace(/```json|```/g, '').trim();
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error('Could not parse model output as JSON:', rawText);
+      return new Response(JSON.stringify({ error: 'parse_error' }), {
+        status: 502,
+        headers: corsHeaders(),
+      });
+    }
+
+    return new Response(JSON.stringify(parsed), { status: 200, headers: corsHeaders() });
+  } catch (err) {
+    console.error('analyze-progress handler error:', err);
+    return new Response(JSON.stringify({ error: 'internal_error' }), {
+      status: 500,
+      headers: corsHeaders(),
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -147,6 +273,16 @@ export default {
       }
       if (request.method === 'POST') {
         return handleAnalyzeFood(request, env.GOOGLE_AI_API_KEY);
+      }
+      return new Response('Method not allowed', { status: 405 });
+    }
+
+    if (url.pathname === '/api/analyze-progress') {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders() });
+      }
+      if (request.method === 'POST') {
+        return handleAnalyzeProgress(request, env.GOOGLE_AI_API_KEY);
       }
       return new Response('Method not allowed', { status: 405 });
     }
